@@ -19,17 +19,17 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       <button
         type="button"
         aria-label="Close settings"
-        className="absolute inset-0 bg-slate-950/60 backdrop-blur-[1px]"
+        className="absolute inset-0 bg-neutral-950/60 backdrop-blur-[1px]"
         onClick={onClose}
       />
 
-      <aside className="relative z-10 flex h-full w-80 flex-col border-l border-slate-800 bg-slate-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
-          <h2 className="text-lg font-semibold text-slate-50">Settings</h2>
+      <aside className="relative z-10 flex h-full w-80 flex-col border-l border-neutral-600/80 bg-neutral-950 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-neutral-600/80 px-5 py-4">
+          <h2 className="text-lg font-semibold text-neutral-100">Settings</h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-2 py-1 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+            className="rounded-md px-2 py-1 text-sm text-neutral-400 transition hover:bg-neutral-800 hover:text-neutral-200"
           >
             Close
           </button>
@@ -40,19 +40,19 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
             {PLACEHOLDER_SECTIONS.map((section) => (
               <div
                 key={section.title}
-                className="rounded-xl border border-slate-800 bg-slate-800/40 px-4 py-3"
+                className="rounded-xl border border-neutral-600/70 bg-neutral-900/50 px-4 py-3"
               >
-                <p className="text-sm font-medium text-slate-100">
+                <p className="text-sm font-medium text-neutral-100">
                   {section.title}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-neutral-500">
                   {section.description}
                 </p>
               </div>
             ))}
           </div>
 
-          <p className="mt-6 text-xs text-slate-500">
+          <p className="mt-6 text-xs text-neutral-500">
             Settings are placeholders for now — nothing here is saved yet.
           </p>
         </div>

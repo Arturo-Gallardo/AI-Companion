@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  DEFAULT_GRABBED_LEAN_FRAME,
   getAnimationForAction,
   getFramePath,
-  getGrabbedFrameFromVelocity,
   TICK_INTERVAL_MS,
 } from "../animations/beyondBirthday";
 import type { CompanionAction, FacingDirection } from "../animations/types";
@@ -10,7 +10,7 @@ import type { CompanionAction, FacingDirection } from "../animations/types";
 interface UseCompanionAnimationOptions {
   action: CompanionAction;
   facing: FacingDirection;
-  grabbedVelocityX: number;
+  grabbedLeanFrame?: string;
   onTick?: (deltaX: number) => void;
   onBounceComplete?: () => void;
 }
@@ -22,7 +22,7 @@ interface UseCompanionAnimationResult {
 export function useCompanionAnimation({
   action,
   facing,
-  grabbedVelocityX,
+  grabbedLeanFrame = DEFAULT_GRABBED_LEAN_FRAME,
   onTick,
   onBounceComplete,
 }: UseCompanionAnimationOptions): UseCompanionAnimationResult {
@@ -91,7 +91,7 @@ export function useCompanionAnimation({
 
   if (action === "grabbed") {
     return {
-      frameSrc: getFramePath(getGrabbedFrameFromVelocity(grabbedVelocityX)),
+      frameSrc: getFramePath(grabbedLeanFrame),
     };
   }
 

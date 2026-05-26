@@ -10,7 +10,7 @@ export function CompanionWindow() {
     facing,
     behaviorState,
     isReady,
-    grabbedVelocityX,
+    grabbedLeanFrame,
     onWalkTick,
     onBounceComplete,
     onPointerDown,
@@ -19,7 +19,7 @@ export function CompanionWindow() {
   const { frameSrc } = useCompanionAnimation({
     action,
     facing,
-    grabbedVelocityX,
+    grabbedLeanFrame,
     onTick: onWalkTick,
     onBounceComplete,
   });
@@ -27,7 +27,7 @@ export function CompanionWindow() {
   useCompanionMirrorBroadcast({
     action,
     facing,
-    grabbedVelocityX,
+    grabbedLeanFrame,
     isDragging: behaviorState === "dragging",
   });
 

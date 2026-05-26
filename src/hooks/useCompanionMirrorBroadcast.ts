@@ -8,7 +8,7 @@ export function useCompanionMirrorBroadcast(state: CompanionMirrorState): void {
   }, [
     state.action,
     state.facing,
-    state.grabbedVelocityX,
+    state.grabbedLeanFrame,
     state.isDragging,
   ]);
 }

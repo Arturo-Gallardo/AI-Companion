@@ -27,7 +27,7 @@ interface UseCompanionBehaviorResult {
   facing: FacingDirection;
   behaviorState: CompanionBehaviorState;
   isReady: boolean;
-  grabbedVelocityX: number;
+  grabbedLeanFrame: string;
   onWalkTick: (deltaX: number) => void;
   onBounceComplete: () => void;
   onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
@@ -143,7 +143,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
       behaviorState === "walking" ||
       behaviorState === "falling");
 
-  const { grabbedVelocityX, onPointerDown } = useCompanionDrag({
+  const { grabbedLeanFrame, onPointerDown } = useCompanionDrag({
     isEnabled: dragEnabled,
     skipResistDelay: skipResistOnGrab,
     getAnchorPosition,
@@ -266,7 +266,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     facing,
     behaviorState,
     isReady,
-    grabbedVelocityX,
+    grabbedLeanFrame,
     onWalkTick,
     onBounceComplete,
     onPointerDown,

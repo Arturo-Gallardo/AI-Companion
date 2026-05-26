@@ -11,7 +11,7 @@ export function CompanionPreview() {
   const { frameSrc } = useCompanionAnimation({
     action: mirrorState.action,
     facing: mirrorState.facing,
-    grabbedVelocityX: mirrorState.grabbedVelocityX,
+    grabbedLeanFrame: mirrorState.grabbedLeanFrame,
   });
 
   const previewWidth = SPRITE_WIDTH * PREVIEW_SCALE;

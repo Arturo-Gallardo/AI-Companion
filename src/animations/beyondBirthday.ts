@@ -17,7 +17,7 @@ export const FALL_GRAVITY = 3;
 export const FALL_AIR_RESISTANCE_X = 0.05;
 export const FALL_AIR_RESISTANCE_Y = 0.05;
 
-// ported from public/Beyond Birthday/conf/動作.xml
+// animation timings ported from original shimeji 動作.xml
 export const IDLE_ANIMATION: AnimationDefinition = {
   frames: ["shime1.png"],
   tickDuration: 6,
@@ -48,11 +48,26 @@ export const RESIST_ANIMATION: AnimationDefinition = {
   velocity: { x: 0, y: 0 },
 };
 
-// grabbed lean thresholds in px/tick (25ms cadence)
+// grabbed lean reference thresholds in px/tick (25ms cadence)
 export const GRAB_VELOCITY_STRONG = 6;
 export const GRAB_VELOCITY_MILD = 2;
 
-// grabbed uses dynamic frame selection via getGrabbedFrameFromVelocity
+// hysteresis — enter higher, exit lower so slow drags dont flicker tiers
+export const GRAB_ENTER_MILD = 2.5;
+export const GRAB_EXIT_MILD = 1;
+export const GRAB_ENTER_STRONG = 6.5;
+export const GRAB_EXIT_STRONG = 4.5;
+
+export type GrabbedLeanTier =
+  | "neutral"
+  | "mildLeft"
+  | "strongLeft"
+  | "mildRight"
+  | "strongRight";
+
+export const DEFAULT_GRABBED_LEAN_FRAME = "shime1.png";
+
+// grabbed uses dynamic frame selection via lean tier hysteresis
 export const GRABBED_ANIMATION: AnimationDefinition = {
   frames: ["shime1.png"],
   tickDuration: 5,
@@ -74,27 +89,76 @@ export function getAnimationForAction(
   return ANIMATION_BY_ACTION[action];
 }
 
+export function getGrabbedFrameFromLeanTier(tier: GrabbedLeanTier): string {
+  switch (tier) {
+    case "mildLeft":
+      return "shime7.png";
+    case "strongLeft":
+      return "shime9.png";
+    case "mildRight":
+      return "shime8.png";
+    case "strongRight":
+      return "shime10.png";
+    case "neutral":
+    default:
+      return DEFAULT_GRABBED_LEAN_FRAME;
+  }
+}
+
 // lean opposes drag direction — same feel as shimeji footX vs cursor offset
+export function resolveGrabbedLeanTier(
+  previous: GrabbedLeanTier,
+  velocityX: number,
+): GrabbedLeanTier {
+  const lean = -velocityX;
+
+  switch (previous) {
+    case "strongLeft":
+      if (lean > -GRAB_EXIT_STRONG) {
+        return lean > -GRAB_EXIT_MILD ? "neutral" : "mildLeft";
+      }
+      return "strongLeft";
+
+    case "mildLeft":
+      if (lean < -GRAB_ENTER_STRONG) {
+        return "strongLeft";
+      }
+      if (lean > -GRAB_EXIT_MILD) {
+        return "neutral";
+      }
+      return "mildLeft";
+
+    case "strongRight":
+      if (lean < GRAB_EXIT_STRONG) {
+        return lean < GRAB_EXIT_MILD ? "neutral" : "mildRight";
+      }
+      return "strongRight";
+
+    case "mildRight":
+      if (lean > GRAB_ENTER_STRONG) {
+        return "strongRight";
+      }
+      if (lean < GRAB_EXIT_MILD) {
+        return "neutral";
+      }
+      return "mildRight";
+
+    case "neutral":
+    default:
+      if (lean < -GRAB_ENTER_MILD) {
+        return "mildLeft";
+      }
+      if (lean > GRAB_ENTER_MILD) {
+        return "mildRight";
+      }
+      return "neutral";
+  }
+}
+
 export function getGrabbedFrameFromVelocity(velocityX: number): string {
-  const leanVelocity = -velocityX;
-
-  if (leanVelocity < -GRAB_VELOCITY_STRONG) {
-    return "shime9.png";
-  }
-
-  if (leanVelocity < -GRAB_VELOCITY_MILD) {
-    return "shime7.png";
-  }
-
-  if (leanVelocity > GRAB_VELOCITY_STRONG) {
-    return "shime10.png";
-  }
-
-  if (leanVelocity > GRAB_VELOCITY_MILD) {
-    return "shime8.png";
-  }
-
-  return "shime1.png";
+  return getGrabbedFrameFromLeanTier(
+    resolveGrabbedLeanTier("neutral", velocityX),
+  );
 }
 
 export function getFramePath(frame: string): string {

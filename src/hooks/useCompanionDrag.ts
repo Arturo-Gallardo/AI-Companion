@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { TICK_INTERVAL_MS } from "../animations/beyondBirthday";
+import {
+  DEFAULT_GRABBED_LEAN_FRAME,
+  getGrabbedFrameFromLeanTier,
+  resolveGrabbedLeanTier,
+  TICK_INTERVAL_MS,
+  type GrabbedLeanTier,
+} from "../animations/beyondBirthday";
 import type {
   AnchorClampMode,
   DragOffset,
@@ -9,6 +15,7 @@ import type {
 
 const RESIST_DURATION_MS = 200;
 const VELOCITY_SAMPLE_COUNT = 3;
+const VELOCITY_EMA_ALPHA = 0.25;
 
 interface PointerSample {
   x: number;
@@ -52,7 +59,7 @@ interface UseCompanionDragOptions {
 
 interface UseCompanionDragResult {
   isDragging: boolean;
-  grabbedVelocityX: number;
+  grabbedLeanFrame: string;
   onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
 }
 
@@ -66,9 +73,11 @@ export function useCompanionDrag({
   onDragEnd,
 }: UseCompanionDragOptions): UseCompanionDragResult {
   const [isDragging, setIsDragging] = useState(false);
-  const [grabbedVelocityX, setGrabbedVelocityX] = useState(0);
+  const [grabbedLeanFrame, setGrabbedLeanFrame] = useState(DEFAULT_GRABBED_LEAN_FRAME);
 
   const isDraggingRef = useRef(false);
+  const leanTierRef = useRef<GrabbedLeanTier>("neutral");
+  const smoothedVelocityRef = useRef(0);
   const dragOffsetRef = useRef<DragOffset>({ x: 0, y: 0 });
   const pointerSamplesRef = useRef<PointerSample[]>([]);
   const activePointerIdRef = useRef<number | null>(null);
@@ -97,6 +106,22 @@ export function useCompanionDrag({
     }
   }, []);
 
+  const resetLeanState = useCallback(() => {
+    leanTierRef.current = "neutral";
+    smoothedVelocityRef.current = 0;
+    setGrabbedLeanFrame(DEFAULT_GRABBED_LEAN_FRAME);
+  }, []);
+
+  const updateLeanFromVelocity = useCallback((rawVelocityX: number) => {
+    const smoothed =
+      smoothedVelocityRef.current * (1 - VELOCITY_EMA_ALPHA) +
+      rawVelocityX * VELOCITY_EMA_ALPHA;
+    smoothedVelocityRef.current = smoothed;
+
+    leanTierRef.current = resolveGrabbedLeanTier(leanTierRef.current, smoothed);
+    setGrabbedLeanFrame(getGrabbedFrameFromLeanTier(leanTierRef.current));
+  }, []);
+
   const finishDrag = useCallback(
     (_event: PointerEvent) => {
       if (!isDraggingRef.current) {
@@ -105,7 +130,7 @@ export function useCompanionDrag({
 
       isDraggingRef.current = false;
       setIsDragging(false);
-      setGrabbedVelocityX(0);
+      resetLeanState();
       clearResistTimeout();
 
       const samples = pointerSamplesRef.current;
@@ -143,7 +168,7 @@ export function useCompanionDrag({
       captureElementRef.current = null;
       activePointerIdRef.current = null;
     },
-    [clearResistTimeout, getAnchorPosition],
+    [clearResistTimeout, getAnchorPosition, resetLeanState],
   );
 
   const handlePointerMove = useCallback(
@@ -173,10 +198,10 @@ export function useCompanionDrag({
         y: event.screenY + offset.y,
       };
 
-      setGrabbedVelocityX(velocityX);
+      updateLeanFromVelocity(velocityX);
       void setAnchorPosition(nextPosition, "walls");
     },
-    [setAnchorPosition],
+    [setAnchorPosition, updateLeanFromVelocity],
   );
 
   useEffect(() => {
@@ -213,7 +238,7 @@ export function useCompanionDrag({
       ];
 
       setIsDragging(true);
-      setGrabbedVelocityX(0);
+      resetLeanState();
       onDragStartRef.current();
 
       captureElementRef.current = event.currentTarget;
@@ -230,12 +255,12 @@ export function useCompanionDrag({
         onResistEndRef.current();
       }, RESIST_DURATION_MS);
     },
-    [clearResistTimeout, getAnchorPosition, isEnabled],
+    [clearResistTimeout, getAnchorPosition, isEnabled, resetLeanState],
   );
 
   return {
     isDragging,
-    grabbedVelocityX,
+    grabbedLeanFrame,
     onPointerDown,
   };
 }

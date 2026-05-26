@@ -32,8 +32,6 @@ export type CompanionBehaviorState =
   | "falling"
   | "bouncing";
 
-export type FacingDirection = "left" | "right";
-
 export type AnchorClampMode = "walls" | "grounded";
 
 export interface DragOffset {
