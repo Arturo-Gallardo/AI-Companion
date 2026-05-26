@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# internal project docs (not committed)
+docs/Changes.md
+docs/Instructions.md
+docs/Structure.md
+
+# cursor rules and config (commit only if explicitly requested)
+.cursor/
+.cursorrules

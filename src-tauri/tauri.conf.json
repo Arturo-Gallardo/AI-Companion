@@ -12,7 +12,8 @@
   "app": {
     "windows": [
       {
-        "title": "ai-companion",
+        "label": "main",
+        "title": "AI Focus Companion",
         "width": 800,
         "height": 600
       }
