@@ -5,8 +5,10 @@ interface CompanionSpriteProps {
   frameSrc: string;
   facing: FacingDirection;
   action: CompanionAction;
-  isDragging: boolean;
-  onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
+  isDragging?: boolean;
+  interactive?: boolean;
+  scale?: number;
+  onPointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
 }
 
 function shouldFlipSprite(action: CompanionAction, facing: FacingDirection): boolean {
@@ -21,28 +23,32 @@ export function CompanionSprite({
   frameSrc,
   facing,
   action,
-  isDragging,
+  isDragging = false,
+  interactive = true,
+  scale = 1,
   onPointerDown,
 }: CompanionSpriteProps) {
   const flipScale = shouldFlipSprite(action, facing) ? -1 : 1;
+  const width = SPRITE_WIDTH * scale;
+  const height = SPRITE_HEIGHT * scale;
 
   return (
     <div
       className="relative overflow-visible"
-      style={{ width: SPRITE_WIDTH, height: SPRITE_HEIGHT }}
+      style={{ width, height }}
     >
       <img
         src={frameSrc}
         alt="Focus companion"
         draggable={false}
-        onPointerDown={onPointerDown}
+        onPointerDown={interactive ? onPointerDown : undefined}
         className="absolute left-0 top-0 max-w-none touch-none select-none"
         style={{
-          width: SPRITE_WIDTH,
-          height: SPRITE_HEIGHT,
-          cursor: isDragging ? "grabbing" : "grab",
+          width,
+          height,
+          cursor: interactive ? (isDragging ? "grabbing" : "grab") : "default",
           transform: `scaleX(${flipScale})`,
-          transformOrigin: `${SPRITE_ANCHOR.x}px ${SPRITE_ANCHOR.y}px`,
+          transformOrigin: `${SPRITE_ANCHOR.x * scale}px ${SPRITE_ANCHOR.y * scale}px`,
         }}
       />
     </div>

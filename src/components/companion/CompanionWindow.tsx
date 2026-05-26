@@ -1,6 +1,7 @@
 import { SPRITE_HEIGHT, SPRITE_WIDTH } from "../../animations/beyondBirthday";
 import { useCompanionAnimation } from "../../hooks/useCompanionAnimation";
 import { useCompanionBehavior } from "../../hooks/useCompanionBehavior";
+import { useCompanionMirrorBroadcast } from "../../hooks/useCompanionMirrorBroadcast";
 import { CompanionSprite } from "./CompanionSprite";
 
 export function CompanionWindow() {
@@ -21,6 +22,13 @@ export function CompanionWindow() {
     grabbedVelocityX,
     onTick: onWalkTick,
     onBounceComplete,
+  });
+
+  useCompanionMirrorBroadcast({
+    action,
+    facing,
+    grabbedVelocityX,
+    isDragging: behaviorState === "dragging",
   });
 
   if (!isReady) {
