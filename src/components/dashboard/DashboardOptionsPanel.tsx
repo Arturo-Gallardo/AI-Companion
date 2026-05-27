@@ -1,14 +1,8 @@
 import { emitDialogueStart } from "../../services/companionDialogue";
 import { useCompanionMirrorState } from "../../hooks/useCompanionMirrorState";
+import { pickRandomMotivationalQuote } from "../../utils/pickRandomQuote";
 
-const TEST_DIALOGUE_TEXT = "hello";
-
-const BLOCKED_DIALOGUE_STATES = new Set([
-  "dragging",
-  "falling",
-  "bouncing",
-  "dialoguing",
-]);
+const BLOCKED_DIALOGUE_STATES = new Set(["dragging", "falling", "bouncing"]);
 
 export function DashboardOptionsPanel() {
   const mirrorState = useCompanionMirrorState();
@@ -19,7 +13,7 @@ export function DashboardOptionsPanel() {
       return;
     }
 
-    void emitDialogueStart(TEST_DIALOGUE_TEXT);
+    void emitDialogueStart(pickRandomMotivationalQuote());
   };
   return (
     <section className="flex h-full min-h-0 items-center justify-center p-8">

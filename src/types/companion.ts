@@ -1,8 +1,5 @@
 import { SPRITE_HEIGHT } from "../animations/beyondBirthday";
 
-// how long dialogue stays visible before auto-dismiss
-export const DIALOGUE_DISPLAY_MS = 3000;
-
 export interface WorkArea {
   x: number;
   y: number;

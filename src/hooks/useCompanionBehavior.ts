@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CompanionAction, FacingDirection } from "../animations/types";
 import { LANDING_THRESHOLD } from "../animations/beyondBirthday";
 import {
-  DIALOGUE_DISPLAY_MS,
   type CompanionBehaviorState,
   type FallVelocity,
 } from "../types/companion";
+import { getDialogueDisplayMs } from "../utils/dialogueDuration";
 import { getDesktopHorizontalRange } from "../utils/monitorBounds";
 import { useCompanionDrag } from "./useCompanionDrag";
 import { useCompanionFall } from "./useCompanionFall";
@@ -91,7 +91,11 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
 
   const startDialogue = useCallback((text: string) => {
     const currentState = behaviorStateRef.current;
-    if (currentState !== "idle" && currentState !== "walking") {
+    if (
+      currentState !== "idle" &&
+      currentState !== "walking" &&
+      currentState !== "dialoguing"
+    ) {
       return;
     }
 
@@ -119,7 +123,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
 
     const timeoutId = window.setTimeout(() => {
       dismissDialogue();
-    }, DIALOGUE_DISPLAY_MS);
+    }, getDialogueDisplayMs(dialogueText));
 
     return () => {
       window.clearTimeout(timeoutId);
