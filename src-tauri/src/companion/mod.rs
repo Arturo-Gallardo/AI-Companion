@@ -4,8 +4,10 @@ use tauri::{AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuild
 
 pub const SPRITE_WIDTH: f64 = 128.0;
 pub const SPRITE_HEIGHT: f64 = 128.0;
+pub const SPEECH_AREA_HEIGHT: f64 = 72.0;
+pub const COMPANION_WINDOW_HEIGHT: f64 = SPRITE_HEIGHT + SPEECH_AREA_HEIGHT;
 pub const ANCHOR_X: f64 = 64.0;
-pub const ANCHOR_Y: f64 = 128.0;
+pub const ANCHOR_Y: f64 = COMPANION_WINDOW_HEIGHT;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct WorkArea {
@@ -207,7 +209,7 @@ pub fn create_companion_window(app: &AppHandle) -> Result<(), String> {
 
     let companion_window = WebviewWindowBuilder::new(app, "companion", WebviewUrl::default())
         .title("Companion")
-        .inner_size(SPRITE_WIDTH, SPRITE_HEIGHT)
+        .inner_size(SPRITE_WIDTH, COMPANION_WINDOW_HEIGHT)
         .position(window_x, window_y)
         .decorations(false)
         .transparent(true)

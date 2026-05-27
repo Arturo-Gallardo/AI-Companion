@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CompanionAction, FacingDirection } from "../animations/types";
 import { LANDING_THRESHOLD } from "../animations/beyondBirthday";
-import type {
-  CompanionBehaviorState,
-  FallVelocity,
+import {
+  DIALOGUE_DISPLAY_MS,
+  type CompanionBehaviorState,
+  type FallVelocity,
 } from "../types/companion";
 import { getDesktopHorizontalRange } from "../utils/monitorBounds";
 import { useCompanionDrag } from "./useCompanionDrag";
@@ -26,11 +27,14 @@ interface UseCompanionBehaviorResult {
   action: CompanionAction;
   facing: FacingDirection;
   behaviorState: CompanionBehaviorState;
+  dialogueText: string | null;
   isReady: boolean;
   grabbedLeanFrame: string;
   onWalkTick: (deltaX: number) => void;
   onBounceComplete: () => void;
   onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
+  startDialogue: (text: string) => void;
+  dismissDialogue: () => void;
 }
 
 export function useCompanionBehavior(): UseCompanionBehaviorResult {
@@ -56,6 +60,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     y: 0,
   });
   const [skipResistOnGrab, setSkipResistOnGrab] = useState(false);
+  const [dialogueText, setDialogueText] = useState<string | null>(null);
 
   const targetXRef = useRef<number | null>(null);
   const anchorXRef = useRef(anchorX);
@@ -79,15 +84,55 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     targetXRef.current = null;
     isDraggingRef.current = false;
     setSkipResistOnGrab(false);
+    setDialogueText(null);
     setBehaviorState("idle");
     setAction("idle");
   }, []);
 
+  const startDialogue = useCallback((text: string) => {
+    const currentState = behaviorStateRef.current;
+    if (currentState !== "idle" && currentState !== "walking") {
+      return;
+    }
+
+    // clears any in-progress walk target so movement stops immediately
+    targetXRef.current = null;
+    setDialogueText(text);
+    setBehaviorState("dialoguing");
+    setAction("idle");
+  }, []);
+
+  const dismissDialogue = useCallback(() => {
+    if (behaviorStateRef.current !== "dialoguing") {
+      return;
+    }
+
+    setDialogueText(null);
+    setBehaviorState("idle");
+    setAction("idle");
+  }, []);
+
+  useEffect(() => {
+    if (behaviorState !== "dialoguing" || dialogueText === null) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      dismissDialogue();
+    }, DIALOGUE_DISPLAY_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [behaviorState, dialogueText, dismissDialogue]);
+
   const handleDragStart = useCallback(() => {
-    const wasFalling = behaviorStateRef.current === "falling";
+    const currentState = behaviorStateRef.current;
+    const wasFalling = currentState === "falling";
 
     targetXRef.current = null;
     isDraggingRef.current = true;
+    setDialogueText(null);
 
     if (wasFalling) {
       setFallVelocity({ x: 0, y: 0 });
@@ -141,6 +186,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     isReady &&
     (behaviorState === "idle" ||
       behaviorState === "walking" ||
+      behaviorState === "dialoguing" ||
       behaviorState === "falling");
 
   const { grabbedLeanFrame, onPointerDown } = useCompanionDrag({
@@ -265,10 +311,13 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     action,
     facing,
     behaviorState,
+    dialogueText,
     isReady,
     grabbedLeanFrame,
     onWalkTick,
     onBounceComplete,
     onPointerDown,
+    startDialogue,
+    dismissDialogue,
   };
 }

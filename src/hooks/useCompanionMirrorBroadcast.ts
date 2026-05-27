@@ -10,5 +10,7 @@ export function useCompanionMirrorBroadcast(state: CompanionMirrorState): void {
     state.facing,
     state.grabbedLeanFrame,
     state.isDragging,
+    state.behaviorState,
+    state.dialogueText,
   ]);
 }

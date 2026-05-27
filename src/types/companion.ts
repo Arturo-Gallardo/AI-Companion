@@ -1,3 +1,8 @@
+import { SPRITE_HEIGHT } from "../animations/beyondBirthday";
+
+// how long dialogue stays visible before auto-dismiss
+export const DIALOGUE_DISPLAY_MS = 3000;
+
 export interface WorkArea {
   x: number;
   y: number;
@@ -30,7 +35,12 @@ export type CompanionBehaviorState =
   | "walking"
   | "dragging"
   | "falling"
-  | "bouncing";
+  | "bouncing"
+  | "dialoguing";
+
+// extra space above the sprite for speech bubbles
+export const SPEECH_AREA_HEIGHT = 72;
+export const COMPANION_WINDOW_HEIGHT = SPRITE_HEIGHT + SPEECH_AREA_HEIGHT;
 
 export type AnchorClampMode = "walls" | "grounded";
 
