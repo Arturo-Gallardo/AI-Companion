@@ -1,5 +1,5 @@
 const MIN_DIALOGUE_MS = 2500;
-const MAX_DIALOGUE_MS = 8000;
+const MAX_DIALOGUE_MS = 12000;
 const MS_PER_CHARACTER = 45;
 
 // longer quotes stay up a bit longer so they can be read
