@@ -39,7 +39,7 @@ export function CompanionSprite({
     >
       <img
         src={frameSrc}
-        alt="Focus companion"
+        alt="Tomoji companion"
         draggable={false}
         onPointerDown={interactive ? onPointerDown : undefined}
         className="absolute left-0 top-0 max-w-none touch-none select-none"

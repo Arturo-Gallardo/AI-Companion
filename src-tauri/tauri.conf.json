@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ai-companion",
+  "productName": "Tomoji",
   "version": "0.1.0",
-  "identifier": "com.josea.ai-companion",
+  "identifier": "com.josea.tomoji",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "AI Focus Companion",
+        "title": "Tomoji",
         "width": 960,
         "height": 640
       }

@@ -20,7 +20,7 @@ pub fn create_tray(app: &AppHandle) -> Result<(), String> {
 
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(tauri::include_image!("icons/32x32.png"))
-        .tooltip("AI Focus Companion")
+        .tooltip("Tomoji")
         .menu(&menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             MENU_SHOW => show_dashboard(app),

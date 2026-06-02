@@ -1,25 +1,15 @@
 mod companion;
-mod focus;
 mod main_window;
 mod tray;
 
 use companion::{
     create_companion_window, get_desktop_bounds, get_work_area, set_companion_position,
 };
-use focus::analyze_screen_activity;
 use main_window::{configure_main_window, handle_window_event};
 use tray::create_tray;
 
-fn load_env_files() {
-    let _ = dotenvy::from_filename("../.env.local");
-    let _ = dotenvy::from_filename(".env.local");
-    let _ = dotenvy::dotenv();
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    load_env_files();
-
     tauri::Builder::default()
         .setup(|app| {
             configure_main_window(app.handle())?;
@@ -34,7 +24,6 @@ pub fn run() {
             get_work_area,
             get_desktop_bounds,
             set_companion_position,
-            analyze_screen_activity
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
