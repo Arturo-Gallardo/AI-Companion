@@ -11,12 +11,15 @@ export interface Velocity {
 export interface AnimationDefinition {
   frames: string[];
   tickDuration: number;
+  // optional per-frame hold lengths in tick units (25ms each)
+  frameTickDurations?: number[];
   velocity: Velocity;
 }
 
 export type CompanionAction =
   | "idle"
   | "walk"
+  | "sit"
   | "grabbed"
   | "resist"
   | "fall"

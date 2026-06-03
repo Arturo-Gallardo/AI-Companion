@@ -1,12 +1,19 @@
+mod menu;
 mod speech;
+mod walk_picker;
 
 use serde::Serialize;
 use tauri::window::Color;
 use tauri::{AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 
+pub use menu::{create_companion_menu_window, hide_companion_menu, show_companion_menu};
 pub use speech::{
     create_companion_speech_window, hide_companion_speech, set_companion_speech_size,
     show_companion_speech, sync_companion_speech_position, take_companion_speech_content,
+};
+pub use walk_picker::{
+    cancel_walk_picker, create_walk_picker_window, hide_walk_picker, show_walk_picker,
+    submit_walk_picker_target,
 };
 
 pub const SPRITE_WIDTH: f64 = 128.0;

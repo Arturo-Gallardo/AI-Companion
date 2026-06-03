@@ -27,6 +27,7 @@ export interface ScreenPosition {
 export type CompanionBehaviorState =
   | "idle"
   | "walking"
+  | "sitting"
   | "dragging"
   | "falling"
   | "bouncing"

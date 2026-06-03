@@ -20,7 +20,13 @@ html.companion-root body,
 html.companion-root #root,
 html.companion-speech-root,
 html.companion-speech-root body,
-html.companion-speech-root #root {
+html.companion-speech-root #root,
+html.companion-menu-root,
+html.companion-menu-root body,
+html.companion-menu-root #root,
+html.walk-picker-root,
+html.walk-picker-root body,
+html.walk-picker-root #root {
   background: transparent !important;
   background-color: transparent !important;
   min-height: 0;

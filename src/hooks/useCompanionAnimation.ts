@@ -3,9 +3,10 @@ import {
   DEFAULT_GRABBED_LEAN_FRAME,
   getAnimationForAction,
   getFramePath,
+  getFrameTickDuration,
   TICK_INTERVAL_MS,
 } from "../animations/beyondBirthday";
-import type { CompanionAction, FacingDirection } from "../animations/types";
+import type { AnimationDefinition, CompanionAction, FacingDirection } from "../animations/types";
 
 interface UseCompanionAnimationOptions {
   action: CompanionAction;
@@ -19,6 +20,13 @@ interface UseCompanionAnimationResult {
   frameSrc: string;
 }
 
+function advanceFrameIndex(
+  animation: AnimationDefinition,
+  currentIndex: number,
+): number {
+  return (currentIndex + 1) % animation.frames.length;
+}
+
 export function useCompanionAnimation({
   action,
   facing,
@@ -27,10 +35,18 @@ export function useCompanionAnimation({
   onBounceComplete,
 }: UseCompanionAnimationOptions): UseCompanionAnimationResult {
   const [frameIndex, setFrameIndex] = useState(0);
-  const tickCountRef = useRef(0);
+  const frameIndexRef = useRef(0);
+  const frameShownAtRef = useRef(performance.now());
   const bounceCyclesRef = useRef(0);
+  const actionRef = useRef(action);
+  const facingRef = useRef(facing);
   const onTickRef = useRef(onTick);
   const onBounceCompleteRef = useRef(onBounceComplete);
+
+  useEffect(() => {
+    actionRef.current = action;
+    facingRef.current = facing;
+  }, [action, facing]);
 
   useEffect(() => {
     onTickRef.current = onTick;
@@ -38,56 +54,67 @@ export function useCompanionAnimation({
   }, [onBounceComplete, onTick]);
 
   useEffect(() => {
-    setFrameIndex(0);
-    tickCountRef.current = 0;
+    frameIndexRef.current = 0;
+    frameShownAtRef.current = performance.now();
     bounceCyclesRef.current = 0;
+    setFrameIndex(0);
   }, [action]);
 
   useEffect(() => {
-    if (action === "grabbed" || action === "fall") {
+    const currentAction = actionRef.current;
+
+    if (currentAction === "grabbed" || currentAction === "fall") {
       return;
     }
 
-    const animation = getAnimationForAction(action);
-    const directionMultiplier = facing === "right" ? -1 : 1;
-
     const intervalId = window.setInterval(() => {
-      tickCountRef.current += 1;
+      const activeAction = actionRef.current;
+      const animation = getAnimationForAction(activeAction);
+      const directionMultiplier = facingRef.current === "right" ? -1 : 1;
 
-      if (action === "walk" && onTickRef.current) {
+      if (activeAction === "walk" && onTickRef.current) {
         onTickRef.current(animation.velocity.x * directionMultiplier);
       }
 
-      if (tickCountRef.current >= animation.tickDuration) {
-        tickCountRef.current = 0;
+      const frameDurationMs =
+        getFrameTickDuration(animation, frameIndexRef.current) *
+        TICK_INTERVAL_MS;
 
-        if (action === "bounce") {
-          setFrameIndex((current) => {
-            const nextIndex = current + 1;
+      if (performance.now() - frameShownAtRef.current < frameDurationMs) {
+        return;
+      }
 
-            if (nextIndex >= animation.frames.length) {
-              bounceCyclesRef.current += 1;
+      frameShownAtRef.current = performance.now();
 
-              if (bounceCyclesRef.current >= 1) {
-                onBounceCompleteRef.current?.();
-              }
+      if (activeAction === "bounce") {
+        const nextIndex = frameIndexRef.current + 1;
 
-              return 0;
-            }
+        if (nextIndex >= animation.frames.length) {
+          bounceCyclesRef.current += 1;
 
-            return nextIndex;
-          });
+          if (bounceCyclesRef.current >= 1) {
+            onBounceCompleteRef.current?.();
+          }
+
+          frameIndexRef.current = 0;
+          setFrameIndex(0);
           return;
         }
 
-        setFrameIndex((current) => (current + 1) % animation.frames.length);
+        frameIndexRef.current = nextIndex;
+        setFrameIndex(nextIndex);
+        return;
       }
+
+      const nextIndex = advanceFrameIndex(animation, frameIndexRef.current);
+      frameIndexRef.current = nextIndex;
+      setFrameIndex(nextIndex);
     }, TICK_INTERVAL_MS);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [action, facing]);
+  }, [action]);
 
   if (action === "grabbed") {
     return {

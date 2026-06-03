@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { showCompanionMenu } from "../services/companionMenuApi";
 import type { CompanionAction, FacingDirection } from "../animations/types";
 import { LANDING_THRESHOLD } from "../animations/beyondBirthday";
 import {
@@ -37,6 +38,11 @@ interface UseCompanionBehaviorResult {
   onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
   startDialogue: (text: string) => void;
   dismissDialogue: () => void;
+  toggleSit: () => void;
+  turnAround: () => void;
+  walkToAnchorX: (screenX: number) => void;
+  canOpenContextMenu: boolean;
+  onContextMenu: (event: React.MouseEvent<HTMLElement>) => void;
 }
 
 export function useCompanionBehavior(): UseCompanionBehaviorResult {
@@ -96,6 +102,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     if (
       currentState !== "idle" &&
       currentState !== "walking" &&
+      currentState !== "sitting" &&
       currentState !== "dialoguing"
     ) {
       return;
@@ -117,6 +124,32 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     setBehaviorState("idle");
     setAction("idle");
   }, []);
+
+  const startSitting = useCallback(() => {
+    targetXRef.current = null;
+    setDialogueText(null);
+    setBehaviorState("sitting");
+    setAction("sit");
+  }, []);
+
+  const toggleSit = useCallback(() => {
+    const currentState = behaviorStateRef.current;
+
+    if (currentState === "sitting") {
+      returnToIdle();
+      return;
+    }
+
+    if (
+      currentState !== "idle" &&
+      currentState !== "walking" &&
+      currentState !== "dialoguing"
+    ) {
+      return;
+    }
+
+    startSitting();
+  }, [returnToIdle, startSitting]);
 
   useEffect(() => {
     if (behaviorState !== "dialoguing" || dialogueText === null) {
@@ -192,6 +225,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     isReady &&
     (behaviorState === "idle" ||
       behaviorState === "walking" ||
+      behaviorState === "sitting" ||
       behaviorState === "dialoguing" ||
       behaviorState === "falling");
 
@@ -232,6 +266,41 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     setBehaviorState("walking");
     setAction("walk");
   }, []);
+
+  const turnAround = useCallback(() => {
+    const currentState = behaviorStateRef.current;
+    if (
+      currentState === "walking" ||
+      currentState === "dragging" ||
+      currentState === "falling" ||
+      currentState === "bouncing"
+    ) {
+      return;
+    }
+
+    setFacing((current) => (current === "left" ? "right" : "left"));
+  }, []);
+
+  const walkToAnchorX = useCallback(
+    (screenX: number) => {
+      const currentState = behaviorStateRef.current;
+      if (
+        currentState === "dragging" ||
+        currentState === "falling" ||
+        currentState === "bouncing"
+      ) {
+        return;
+      }
+
+      if (currentState === "dialoguing") {
+        setDialogueText(null);
+      }
+
+      const targetX = clampAnchorX(screenX);
+      startWalkingTo(targetX);
+    },
+    [clampAnchorX, startWalkingTo],
+  );
 
   const pickWalkTarget = useCallback(() => {
     if (!desktopBounds) {
@@ -313,6 +382,30 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     returnToIdle();
   }, [behaviorState, returnToIdle]);
 
+  const canOpenContextMenu = useMemo(
+    () =>
+      isReady &&
+      (behaviorState === "idle" ||
+        behaviorState === "walking" ||
+        behaviorState === "sitting" ||
+        behaviorState === "dialoguing" ||
+        behaviorState === "falling"),
+    [behaviorState, isReady],
+  );
+
+  const onContextMenu = useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      event.preventDefault();
+
+      if (!canOpenContextMenu) {
+        return;
+      }
+
+      void showCompanionMenu(event.screenX, event.screenY);
+    },
+    [canOpenContextMenu],
+  );
+
   return {
     action,
     facing,
@@ -326,5 +419,10 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     onPointerDown,
     startDialogue,
     dismissDialogue,
+    toggleSit,
+    turnAround,
+    walkToAnchorX,
+    canOpenContextMenu,
+    onContextMenu,
   };
 }

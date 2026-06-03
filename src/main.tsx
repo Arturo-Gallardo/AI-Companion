@@ -18,12 +18,22 @@ if (windowLabel === "companion-speech") {
   document.documentElement.classList.add("companion-speech-root");
 }
 
+if (windowLabel === "companion-menu") {
+  document.documentElement.classList.add("companion-menu-root");
+}
+
+if (windowLabel === "walk-picker") {
+  document.documentElement.classList.add("walk-picker-root");
+}
+
+const isOverlayWebview =
+  windowLabel === "companion" ||
+  windowLabel === "companion-speech" ||
+  windowLabel === "companion-menu" ||
+  windowLabel === "walk-picker";
+
 const app = <App />;
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  windowLabel === "companion" || windowLabel === "companion-speech" ? (
-    app
-  ) : (
-    <React.StrictMode>{app}</React.StrictMode>
-  ),
+  isOverlayWebview ? app : <React.StrictMode>{app}</React.StrictMode>,
 );

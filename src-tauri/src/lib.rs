@@ -3,9 +3,11 @@ mod main_window;
 mod tray;
 
 use companion::{
-    create_companion_speech_window, create_companion_window, get_desktop_bounds, get_work_area,
-    hide_companion_speech, set_companion_position, set_companion_speech_size,
-    show_companion_speech, take_companion_speech_content,
+    cancel_walk_picker, create_companion_menu_window, create_companion_speech_window,
+    create_companion_window, create_walk_picker_window, get_desktop_bounds, get_work_area,
+    hide_companion_menu, hide_companion_speech, hide_walk_picker, set_companion_position,
+    set_companion_speech_size, show_companion_menu, show_companion_speech, show_walk_picker,
+    submit_walk_picker_target, take_companion_speech_content,
 };
 use main_window::{configure_main_window, handle_window_event};
 use tray::create_tray;
@@ -19,6 +21,8 @@ pub fn run() {
             // speech webview must exist before any invoke from companion — creating it
             // inside a command deadlocks the main thread on Windows
             create_companion_speech_window(app.handle())?;
+            create_companion_menu_window(app.handle())?;
+            create_walk_picker_window(app.handle())?;
             create_tray(app.handle())?;
             Ok(())
         })
@@ -33,6 +37,12 @@ pub fn run() {
             hide_companion_speech,
             set_companion_speech_size,
             take_companion_speech_content,
+            show_companion_menu,
+            hide_companion_menu,
+            show_walk_picker,
+            hide_walk_picker,
+            submit_walk_picker_target,
+            cancel_walk_picker,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -48,6 +48,21 @@ export const RESIST_ANIMATION: AnimationDefinition = {
   velocity: { x: 0, y: 0 },
 };
 
+// sit — single pose held still (Beyond Birthday default: shime15)
+export const SIT_ANIMATION: AnimationDefinition = {
+  frames: ["shime15.png"],
+  tickDuration: 250,
+  velocity: { x: 0, y: 0 },
+};
+
+export function getFrameTickDuration(
+  animation: AnimationDefinition,
+  frameIndex: number,
+): number {
+  const perFrame = animation.frameTickDurations?.[frameIndex];
+  return perFrame ?? animation.tickDuration;
+}
+
 // grabbed lean reference thresholds in px/tick (25ms cadence)
 export const GRAB_VELOCITY_STRONG = 6;
 export const GRAB_VELOCITY_MILD = 2;
@@ -77,6 +92,7 @@ export const GRABBED_ANIMATION: AnimationDefinition = {
 const ANIMATION_BY_ACTION: Record<CompanionAction, AnimationDefinition> = {
   idle: IDLE_ANIMATION,
   walk: WALK_ANIMATION,
+  sit: SIT_ANIMATION,
   grabbed: GRABBED_ANIMATION,
   resist: RESIST_ANIMATION,
   fall: FALL_ANIMATION,

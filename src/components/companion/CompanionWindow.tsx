@@ -3,6 +3,9 @@ import { useCompanionAnimation } from "../../hooks/useCompanionAnimation";
 import { useCompanionBackgroundEvents } from "../../hooks/useCompanionBackgroundEvents";
 import { useCompanionBehavior } from "../../hooks/useCompanionBehavior";
 import { useCompanionDialogueEvents } from "../../hooks/useCompanionDialogueEvents";
+import { useCompanionMenuEvents } from "../../hooks/useCompanionMenuEvents";
+import { useCompanionSitEvents } from "../../hooks/useCompanionSitEvents";
+import { useCompanionWalkPickerEvents } from "../../hooks/useCompanionWalkPickerEvents";
 import { useCompanionMirrorBroadcast } from "../../hooks/useCompanionMirrorBroadcast";
 import { useCompanionSpeechWindow } from "../../hooks/useCompanionSpeechWindow";
 import { CompanionSprite } from "./CompanionSprite";
@@ -21,11 +24,21 @@ export function CompanionWindow() {
     onPointerDown,
     startDialogue,
     dismissDialogue,
+    toggleSit,
+    turnAround,
+    walkToAnchorX,
+    onContextMenu,
   } = useCompanionBehavior();
 
   const backgroundMode = useCompanionBackgroundEvents();
 
   useCompanionDialogueEvents({ startDialogue, dismissDialogue });
+  useCompanionSitEvents({ toggleSit });
+  useCompanionMenuEvents({ onTurnAround: turnAround, onSit: toggleSit });
+  useCompanionWalkPickerEvents({
+    onSelectTarget: walkToAnchorX,
+    onCancel: () => {},
+  });
 
   const { frameSrc } = useCompanionAnimation({
     action,
@@ -67,6 +80,7 @@ export function CompanionWindow() {
         action={action}
         isDragging={behaviorState === "dragging"}
         onPointerDown={onPointerDown}
+        onContextMenu={onContextMenu}
       />
     </div>
   );

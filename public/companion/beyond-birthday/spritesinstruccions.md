@@ -13,6 +13,10 @@ Copy these files from your Shimeji pack into this folder:
 - `shime7.png` through `shime10.png` — grabbed lean poses
 - `shime18.png`, `shime19.png` — landing bounce
 
-You can add `shime11.png` through `shime46.png` later for more animations.
+**Sit:**
+- `shime15.png` — default seated pose (held still)
+- `shime11.png` — alternate sit pose in the shimeji pack
+
+You can add `shime12.png` through `shime46.png` later for more animations.
 
 The app loads sprites from `/companion/beyond-birthday/` at runtime.

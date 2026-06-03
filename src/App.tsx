@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { CompanionMenuWindow } from "./components/companion/CompanionMenuWindow";
 import { CompanionSpeechWindow } from "./components/companion/CompanionSpeechWindow";
 import { CompanionWindow } from "./components/companion/CompanionWindow";
+import { WalkPickerWindow } from "./components/companion/WalkPickerWindow";
 import { DashboardShell } from "./components/dashboard/DashboardShell";
 
 function App() {
@@ -21,6 +23,14 @@ function App() {
 
   if (windowLabel === "companion-speech") {
     return <CompanionSpeechWindow />;
+  }
+
+  if (windowLabel === "companion-menu") {
+    return <CompanionMenuWindow />;
+  }
+
+  if (windowLabel === "walk-picker") {
+    return <WalkPickerWindow />;
   }
 
   return <DashboardShell />;

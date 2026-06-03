@@ -9,6 +9,7 @@ interface CompanionSpriteProps {
   interactive?: boolean;
   scale?: number;
   onPointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
+  onContextMenu?: (event: React.MouseEvent<HTMLElement>) => void;
 }
 
 function shouldFlipSprite(action: CompanionAction, facing: FacingDirection): boolean {
@@ -27,6 +28,7 @@ export function CompanionSprite({
   interactive = true,
   scale = 1,
   onPointerDown,
+  onContextMenu,
 }: CompanionSpriteProps) {
   const flipScale = shouldFlipSprite(action, facing) ? -1 : 1;
   const width = SPRITE_WIDTH * scale;
@@ -42,6 +44,7 @@ export function CompanionSprite({
         alt="Tomoji companion"
         draggable={false}
         onPointerDown={interactive ? onPointerDown : undefined}
+        onContextMenu={interactive ? onContextMenu : undefined}
         className="absolute left-0 top-0 max-w-none touch-none select-none"
         style={{
           width,
