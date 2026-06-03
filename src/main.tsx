@@ -8,12 +8,22 @@ import "@fontsource/plus-jakarta-sans/latin-700.css";
 import App from "./App";
 import "./index.css";
 
-if (getCurrentWebviewWindow().label === "companion") {
+const windowLabel = getCurrentWebviewWindow().label;
+
+if (windowLabel === "companion") {
   document.documentElement.classList.add("companion-root");
 }
 
+if (windowLabel === "companion-speech") {
+  document.documentElement.classList.add("companion-speech-root");
+}
+
+const app = <App />;
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+  windowLabel === "companion" || windowLabel === "companion-speech" ? (
+    app
+  ) : (
+    <React.StrictMode>{app}</React.StrictMode>
+  ),
 );

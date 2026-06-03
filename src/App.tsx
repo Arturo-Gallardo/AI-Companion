@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { CompanionSpeechWindow } from "./components/companion/CompanionSpeechWindow";
 import { CompanionWindow } from "./components/companion/CompanionWindow";
 import { DashboardShell } from "./components/dashboard/DashboardShell";
 
@@ -16,6 +17,10 @@ function App() {
 
   if (windowLabel === "companion") {
     return <CompanionWindow />;
+  }
+
+  if (windowLabel === "companion-speech") {
+    return <CompanionSpeechWindow />;
   }
 
   return <DashboardShell />;

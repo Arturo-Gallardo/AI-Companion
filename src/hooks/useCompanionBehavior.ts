@@ -4,6 +4,7 @@ import { LANDING_THRESHOLD } from "../animations/beyondBirthday";
 import {
   type CompanionBehaviorState,
   type FallVelocity,
+  type ScreenPosition,
 } from "../types/companion";
 import { getDialogueDisplayMs } from "../utils/dialogueDuration";
 import { getDesktopHorizontalRange } from "../utils/monitorBounds";
@@ -30,6 +31,7 @@ interface UseCompanionBehaviorResult {
   dialogueText: string | null;
   isReady: boolean;
   grabbedLeanFrame: string;
+  getAnchorPosition: () => ScreenPosition;
   onWalkTick: (deltaX: number) => void;
   onBounceComplete: () => void;
   onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
@@ -318,6 +320,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     dialogueText,
     isReady,
     grabbedLeanFrame,
+    getAnchorPosition,
     onWalkTick,
     onBounceComplete,
     onPointerDown,

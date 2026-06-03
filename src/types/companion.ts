@@ -1,12 +1,9 @@
-import { SPRITE_HEIGHT } from "../animations/beyondBirthday";
-
 export interface WorkArea {
   x: number;
   y: number;
   width: number;
   height: number;
 }
-
 export interface MonitorWorkArea {
   x: number;
   y: number;
@@ -35,10 +32,8 @@ export type CompanionBehaviorState =
   | "bouncing"
   | "dialoguing";
 
-// extra space above the sprite for speech bubbles
-export const SPEECH_AREA_HEIGHT = 72;
-export const COMPANION_WINDOW_HEIGHT = SPRITE_HEIGHT + SPEECH_AREA_HEIGHT;
-
+// gap between sprite top and speech window bottom
+export const SPEECH_BUBBLE_GAP = 4;
 export type AnchorClampMode = "walls" | "grounded";
 
 export interface DragOffset {

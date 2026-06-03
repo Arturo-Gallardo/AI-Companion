@@ -1,13 +1,24 @@
+mod speech;
+
 use serde::Serialize;
 use tauri::window::Color;
 use tauri::{AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 
+pub use speech::{
+    create_companion_speech_window, hide_companion_speech, set_companion_speech_size,
+    show_companion_speech, sync_companion_speech_position, take_companion_speech_content,
+};
+
 pub const SPRITE_WIDTH: f64 = 128.0;
 pub const SPRITE_HEIGHT: f64 = 128.0;
-pub const SPEECH_AREA_HEIGHT: f64 = 72.0;
-pub const COMPANION_WINDOW_HEIGHT: f64 = SPRITE_HEIGHT + SPEECH_AREA_HEIGHT;
 pub const ANCHOR_X: f64 = 64.0;
-pub const ANCHOR_Y: f64 = COMPANION_WINDOW_HEIGHT;
+
+pub(crate) fn companion_window_position(anchor_x: f64, anchor_y: f64) -> (i32, i32) {
+    (
+        (anchor_x - ANCHOR_X) as i32,
+        (anchor_y - SPRITE_HEIGHT) as i32,
+    )
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct WorkArea {
@@ -70,7 +81,7 @@ fn build_desktop_bounds(monitors: Vec<MonitorWorkArea>) -> DesktopBounds {
 }
 
 #[cfg(windows)]
-fn query_desktop_bounds() -> Result<DesktopBounds, String> {
+pub(crate) fn query_desktop_bounds() -> Result<DesktopBounds, String> {
     use std::sync::Mutex;
     use windows::Win32::Foundation::{BOOL, LPARAM, RECT, TRUE};
     use windows::Win32::Graphics::Gdi::{
@@ -147,7 +158,7 @@ fn query_work_area() -> Result<WorkArea, String> {
 }
 
 #[cfg(not(windows))]
-fn query_desktop_bounds() -> Result<DesktopBounds, String> {
+pub(crate) fn query_desktop_bounds() -> Result<DesktopBounds, String> {
     Ok(build_desktop_bounds(vec![MonitorWorkArea {
         x: 0,
         y: 0,
@@ -182,12 +193,15 @@ pub fn set_companion_position(app: AppHandle, x: f64, y: f64) -> Result<(), Stri
         .get_webview_window("companion")
         .ok_or_else(|| "companion window not found".to_string())?;
 
-    let window_x = x - ANCHOR_X;
-    let window_y = y - ANCHOR_Y;
+    let (window_x, window_y) = companion_window_position(x, y);
 
     window
-        .set_position(PhysicalPosition::new(window_x as i32, window_y as i32))
-        .map_err(|error| format!("failed to move companion window: {error}"))
+        .set_position(PhysicalPosition::new(window_x, window_y))
+        .map_err(|error| format!("failed to move companion window: {error}"))?;
+
+    let _ = sync_companion_speech_position(&app, x, y);
+
+    Ok(())
 }
 
 pub fn create_companion_window(app: &AppHandle) -> Result<(), String> {
@@ -204,13 +218,12 @@ pub fn create_companion_window(app: &AppHandle) -> Result<(), String> {
 
     let start_x = rightmost.x as f64 + rightmost.width as f64 - ANCHOR_X;
     let start_y = rightmost.y as f64 + rightmost.height as f64;
-    let window_x = start_x - ANCHOR_X;
-    let window_y = start_y - ANCHOR_Y;
+    let (window_x, window_y) = companion_window_position(start_x, start_y);
 
     let companion_window = WebviewWindowBuilder::new(app, "companion", WebviewUrl::default())
         .title("Companion")
-        .inner_size(SPRITE_WIDTH, COMPANION_WINDOW_HEIGHT)
-        .position(window_x, window_y)
+        .inner_size(SPRITE_WIDTH, SPRITE_HEIGHT)
+        .position(window_x as f64, window_y as f64)
         .decorations(false)
         .transparent(true)
         // shadows break transparency on windows and show as a grey box around the sprite

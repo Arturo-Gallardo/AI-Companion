@@ -1,11 +1,10 @@
-import { SPRITE_WIDTH } from "../../animations/beyondBirthday";
+import { SPRITE_HEIGHT, SPRITE_WIDTH } from "../../animations/beyondBirthday";
 import { useCompanionAnimation } from "../../hooks/useCompanionAnimation";
 import { useCompanionBackgroundEvents } from "../../hooks/useCompanionBackgroundEvents";
 import { useCompanionBehavior } from "../../hooks/useCompanionBehavior";
 import { useCompanionDialogueEvents } from "../../hooks/useCompanionDialogueEvents";
 import { useCompanionMirrorBroadcast } from "../../hooks/useCompanionMirrorBroadcast";
-import { COMPANION_WINDOW_HEIGHT } from "../../types/companion";
-import { CompanionSpeechBubble } from "./CompanionSpeechBubble";
+import { useCompanionSpeechWindow } from "../../hooks/useCompanionSpeechWindow";
 import { CompanionSprite } from "./CompanionSprite";
 
 export function CompanionWindow() {
@@ -16,6 +15,7 @@ export function CompanionWindow() {
     dialogueText,
     isReady,
     grabbedLeanFrame,
+    getAnchorPosition,
     onWalkTick,
     onBounceComplete,
     onPointerDown,
@@ -35,6 +35,12 @@ export function CompanionWindow() {
     onBounceComplete,
   });
 
+  useCompanionSpeechWindow({
+    dialogueText,
+    getAnchorPosition,
+    isReady,
+  });
+
   useCompanionMirrorBroadcast({
     action,
     facing,
@@ -50,17 +56,11 @@ export function CompanionWindow() {
 
   return (
     <div
-      className={`flex flex-col items-center justify-end ${
+      className={
         backgroundMode === "gray" ? "bg-neutral-600/45" : "bg-transparent"
-      }`}
-      style={{ width: SPRITE_WIDTH, height: COMPANION_WINDOW_HEIGHT }}
+      }
+      style={{ width: SPRITE_WIDTH, height: SPRITE_HEIGHT }}
     >
-      {dialogueText !== null ? (
-        <div className="mb-1 flex w-full justify-center px-1">
-          <CompanionSpeechBubble text={dialogueText} />
-        </div>
-      ) : null}
-
       <CompanionSprite
         frameSrc={frameSrc}
         facing={facing}

@@ -17,11 +17,51 @@ body,
 /* companion window needs a fully transparent root */
 html.companion-root,
 html.companion-root body,
-html.companion-root #root {
+html.companion-root #root,
+html.companion-speech-root,
+html.companion-speech-root body,
+html.companion-speech-root #root {
   background: transparent !important;
   background-color: transparent !important;
   min-height: 0;
   width: 100%;
   height: 100%;
   overflow: hidden;
+}
+
+/* duration matches COMPANION_SPEECH_ANIMATION_MS */
+@keyframes companion-speech-in {
+  from {
+    opacity: 0;
+    transform: scale(0.88) translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes companion-speech-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.88) translateY(6px);
+  }
+}
+
+.companion-speech-bubble-stage {
+  transform-origin: bottom center;
+}
+
+.companion-speech-bubble-enter {
+  animation: companion-speech-in 180ms ease-out forwards;
+}
+
+.companion-speech-bubble-exit {
+  animation: companion-speech-out 180ms ease-in forwards;
 }

@@ -3,7 +3,9 @@ mod main_window;
 mod tray;
 
 use companion::{
-    create_companion_window, get_desktop_bounds, get_work_area, set_companion_position,
+    create_companion_speech_window, create_companion_window, get_desktop_bounds, get_work_area,
+    hide_companion_speech, set_companion_position, set_companion_speech_size,
+    show_companion_speech, take_companion_speech_content,
 };
 use main_window::{configure_main_window, handle_window_event};
 use tray::create_tray;
@@ -14,6 +16,9 @@ pub fn run() {
         .setup(|app| {
             configure_main_window(app.handle())?;
             create_companion_window(app.handle())?;
+            // speech webview must exist before any invoke from companion — creating it
+            // inside a command deadlocks the main thread on Windows
+            create_companion_speech_window(app.handle())?;
             create_tray(app.handle())?;
             Ok(())
         })
@@ -24,6 +29,10 @@ pub fn run() {
             get_work_area,
             get_desktop_bounds,
             set_companion_position,
+            show_companion_speech,
+            hide_companion_speech,
+            set_companion_speech_size,
+            take_companion_speech_content,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
