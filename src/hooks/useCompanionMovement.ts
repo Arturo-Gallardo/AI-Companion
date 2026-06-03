@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
 import {
   getDesktopBounds,
   hitTitleBarAt,
@@ -28,6 +29,7 @@ import { useCompanionWindowSurfaces } from "./useCompanionWindowSurfaces";
 
 interface UseCompanionMovementOptions {
   onSurfaceLockLost?: () => void;
+  usesTitleBarSitAnchorRef?: RefObject<boolean>;
 }
 
 interface UseCompanionMovementResult {
@@ -55,7 +57,7 @@ interface UseCompanionMovementResult {
 export function useCompanionMovement(
   options: UseCompanionMovementOptions = {},
 ): UseCompanionMovementResult {
-  const { onSurfaceLockLost } = options;
+  const { onSurfaceLockLost, usesTitleBarSitAnchorRef } = options;
   const onSurfaceLockLostRef = useRef(onSurfaceLockLost);
 
   useEffect(() => {
@@ -117,8 +119,9 @@ export function useCompanionMovement(
       y,
       bounds.monitors,
       getLockedSurface(),
+      usesTitleBarSitAnchorRef?.current ?? false,
     );
-  }, [getLockedSurface]);
+  }, [getLockedSurface, usesTitleBarSitAnchorRef]);
 
   const clampHorizontalX = useCallback(
     (x: number): number => {

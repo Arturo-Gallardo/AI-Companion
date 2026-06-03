@@ -13,7 +13,7 @@ import { CompanionSurfaceLockIndicator } from "./CompanionSurfaceLockIndicator";
 
 export function CompanionWindow() {
   const {
-    action,
+    displayAction,
     facing,
     behaviorState,
     dialogueText,
@@ -43,7 +43,7 @@ export function CompanionWindow() {
   });
 
   const { frameSrc } = useCompanionAnimation({
-    action,
+    action: displayAction,
     facing,
     grabbedLeanFrame,
     onTick: onWalkTick,
@@ -57,7 +57,7 @@ export function CompanionWindow() {
   });
 
   useCompanionMirrorBroadcast({
-    action,
+    action: displayAction,
     facing,
     grabbedLeanFrame,
     isDragging: behaviorState === "dragging",
@@ -82,7 +82,7 @@ export function CompanionWindow() {
       <CompanionSprite
         frameSrc={frameSrc}
         facing={facing}
-        action={action}
+        action={displayAction}
         isDragging={behaviorState === "dragging"}
         onPointerDown={onPointerDown}
         onContextMenu={onContextMenu}

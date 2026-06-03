@@ -1,4 +1,8 @@
-import { SPRITE_ANCHOR, SPRITE_HEIGHT, SPRITE_WIDTH } from "../../animations/beyondBirthday";
+import {
+  getSpriteAnchorForAction,
+  SPRITE_HEIGHT,
+  SPRITE_WIDTH,
+} from "../../animations/beyondBirthday";
 import type { CompanionAction, FacingDirection } from "../../animations/types";
 
 interface CompanionSpriteProps {
@@ -13,7 +17,13 @@ interface CompanionSpriteProps {
 }
 
 function shouldFlipSprite(action: CompanionAction, facing: FacingDirection): boolean {
-  if (action !== "idle" && action !== "walk") {
+  if (
+    action !== "idle" &&
+    action !== "walk" &&
+    action !== "sit" &&
+    action !== "sitOnBar" &&
+    action !== "dangleOnBar"
+  ) {
     return false;
   }
 
@@ -31,6 +41,7 @@ export function CompanionSprite({
   onContextMenu,
 }: CompanionSpriteProps) {
   const flipScale = shouldFlipSprite(action, facing) ? -1 : 1;
+  const spriteAnchor = getSpriteAnchorForAction(action);
   const width = SPRITE_WIDTH * scale;
   const height = SPRITE_HEIGHT * scale;
 
@@ -51,7 +62,7 @@ export function CompanionSprite({
           height,
           cursor: interactive ? (isDragging ? "grabbing" : "grab") : "default",
           transform: `scaleX(${flipScale})`,
-          transformOrigin: `${SPRITE_ANCHOR.x * scale}px ${SPRITE_ANCHOR.y * scale}px`,
+          transformOrigin: `${spriteAnchor.x * scale}px ${spriteAnchor.y * scale}px`,
         }}
       />
     </div>

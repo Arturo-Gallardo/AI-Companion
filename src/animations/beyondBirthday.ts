@@ -1,4 +1,4 @@
-import type { AnimationDefinition, CompanionAction } from "./types";
+import type { AnimationDefinition, CompanionAction, SpriteAnchor } from "./types";
 
 export const COMPANION_ASSET_BASE = "/companion/beyond-birthday";
 
@@ -6,6 +6,10 @@ export const COMPANION_ASSET_BASE = "/companion/beyond-birthday";
 export const SPRITE_WIDTH = 128;
 export const SPRITE_HEIGHT = 128;
 export const SPRITE_ANCHOR = { x: 64, y: 128 } as const;
+
+// title bar sit — butt on the bar, legs/feet hang below (shime31–33)
+export const TITLE_BAR_SIT_ANCHOR = { x: 64, y: 112 } as const;
+export const TITLE_BAR_SIT_Y_OFFSET = SPRITE_ANCHOR.y - TITLE_BAR_SIT_ANCHOR.y;
 
 // ~25ms per tick matches the shimeji engine cadence
 export const TICK_INTERVAL_MS = 25;
@@ -55,6 +59,20 @@ export const SIT_ANIMATION: AnimationDefinition = {
   velocity: { x: 0, y: 0 },
 };
 
+// perched on a window title bar — legs dangle in front for a 3d look
+export const TITLE_BAR_SIT_ANIMATION: AnimationDefinition = {
+  frames: ["shime31.png"],
+  tickDuration: 250,
+  velocity: { x: 0, y: 0 },
+};
+
+export const TITLE_BAR_DANGLE_ANIMATION: AnimationDefinition = {
+  frames: ["shime31.png", "shime32.png", "shime31.png", "shime33.png"],
+  tickDuration: 5,
+  frameTickDurations: [5, 15, 5, 15],
+  velocity: { x: 0, y: 0 },
+};
+
 export function getFrameTickDuration(
   animation: AnimationDefinition,
   frameIndex: number,
@@ -93,11 +111,37 @@ const ANIMATION_BY_ACTION: Record<CompanionAction, AnimationDefinition> = {
   idle: IDLE_ANIMATION,
   walk: WALK_ANIMATION,
   sit: SIT_ANIMATION,
+  sitOnBar: TITLE_BAR_SIT_ANIMATION,
+  dangleOnBar: TITLE_BAR_DANGLE_ANIMATION,
   grabbed: GRABBED_ANIMATION,
   resist: RESIST_ANIMATION,
   fall: FALL_ANIMATION,
   bounce: BOUNCE_ANIMATION,
 };
+
+export function usesTitleBarSitAnchor(action: CompanionAction): boolean {
+  return action === "sitOnBar" || action === "dangleOnBar";
+}
+
+// when locked to a title bar, only swap floor sit for the perched leg-dangle loop
+export function resolveDisplayAction(
+  action: CompanionAction,
+  isSurfaceLocked: boolean,
+): CompanionAction {
+  if (!isSurfaceLocked) {
+    return action;
+  }
+
+  if (action === "sit") {
+    return "dangleOnBar";
+  }
+
+  return action;
+}
+
+export function getSpriteAnchorForAction(action: CompanionAction): SpriteAnchor {
+  return usesTitleBarSitAnchor(action) ? TITLE_BAR_SIT_ANCHOR : SPRITE_ANCHOR;
+}
 
 export function getAnimationForAction(
   action: CompanionAction,

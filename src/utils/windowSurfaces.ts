@@ -1,4 +1,7 @@
-import { SPRITE_ANCHOR } from "../animations/beyondBirthday";
+import {
+  SPRITE_ANCHOR,
+  TITLE_BAR_SIT_Y_OFFSET,
+} from "../animations/beyondBirthday";
 import type { MonitorWorkArea, WindowSurface } from "../types/companion";
 import { getFloorYAt } from "./monitorBounds";
 
@@ -73,9 +76,12 @@ export function resolveFloorYAt(
   y: number,
   monitors: MonitorWorkArea[],
   lockedSurface: WindowSurface | null,
+  titleBarSitPose = false,
 ): number {
   if (lockedSurface) {
-    return lockedSurface.top;
+    return (
+      lockedSurface.top + (titleBarSitPose ? TITLE_BAR_SIT_Y_OFFSET : 0)
+    );
   }
 
   return getFloorYAt(x, y, monitors);

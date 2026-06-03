@@ -1,10 +1,55 @@
 use tauri::window::Color;
 use tauri::{AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 
+use super::{query_desktop_bounds, MonitorWorkArea};
+
 pub const MENU_WINDOW_LABEL: &str = "companion-menu";
 
 const MENU_WIDTH: f64 = 152.0;
 const MENU_HEIGHT: f64 = 118.0;
+
+fn monitor_at_point<'a>(
+    x: f64,
+    y: f64,
+    monitors: &'a [MonitorWorkArea],
+) -> Option<&'a MonitorWorkArea> {
+    for monitor in monitors {
+        let left = monitor.x as f64;
+        let top = monitor.y as f64;
+        let right = left + monitor.width as f64;
+        let bottom = top + monitor.height as f64;
+
+        if x >= left && x <= right && y >= top && y <= bottom {
+            return Some(monitor);
+        }
+    }
+
+    monitors.first()
+}
+
+fn clamp_menu_position(screen_x: f64, screen_y: f64) -> Result<(i32, i32), String> {
+    let bounds = query_desktop_bounds()?;
+    let monitor = monitor_at_point(screen_x, screen_y, &bounds.monitors)
+        .ok_or_else(|| "no monitors found".to_string())?;
+
+    let mon_left = monitor.x as f64;
+    let mon_top = monitor.y as f64;
+    let mon_right = mon_left + monitor.width as f64;
+    let mon_bottom = mon_top + monitor.height as f64;
+
+    let mut x = screen_x;
+    let mut y = screen_y;
+
+    // open above the cursor when the menu would clip off the bottom
+    if y + MENU_HEIGHT > mon_bottom {
+        y = screen_y - MENU_HEIGHT;
+    }
+
+    x = x.clamp(mon_left, (mon_right - MENU_WIDTH).max(mon_left));
+    y = y.clamp(mon_top, (mon_bottom - MENU_HEIGHT).max(mon_top));
+
+    Ok((x.round() as i32, y.round() as i32))
+}
 
 pub fn create_companion_menu_window(app: &AppHandle) -> Result<(), String> {
     if app.get_webview_window(MENU_WINDOW_LABEL).is_some() {
@@ -39,8 +84,7 @@ pub fn show_companion_menu(app: AppHandle, screen_x: f64, screen_y: f64) -> Resu
         .get_webview_window(MENU_WINDOW_LABEL)
         .ok_or_else(|| "companion menu window not found".to_string())?;
 
-    let window_x = screen_x.round() as i32;
-    let window_y = screen_y.round() as i32;
+    let (window_x, window_y) = clamp_menu_position(screen_x, screen_y)?;
 
     window
         .set_position(PhysicalPosition::new(window_x, window_y))

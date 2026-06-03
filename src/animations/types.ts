@@ -1,4 +1,4 @@
-export interface AnchorPoint {
+export interface SpriteAnchor {
   x: number;
   y: number;
 }
@@ -20,6 +20,8 @@ export type CompanionAction =
   | "idle"
   | "walk"
   | "sit"
+  | "sitOnBar"
+  | "dangleOnBar"
   | "grabbed"
   | "resist"
   | "fall"

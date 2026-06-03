@@ -17,6 +17,10 @@ Copy these files from your Shimeji pack into this folder:
 - `shime15.png` — default seated pose (held still)
 - `shime11.png` — alternate sit pose in the shimeji pack
 
+**Title bar sit (shime31–33):**
+- `shime31.png` — sitting on a window edge, legs down (still)
+- `shime32.png`, `shime33.png` — leg swing frames for the dangle loop
+
 You can add `shime12.png` through `shime46.png` later for more animations.
 
 The app loads sprites from `/companion/beyond-birthday/` at runtime.

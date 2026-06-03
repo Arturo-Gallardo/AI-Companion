@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { showCompanionMenu } from "../services/companionMenuApi";
 import type { CompanionAction, FacingDirection } from "../animations/types";
-import { LANDING_THRESHOLD } from "../animations/beyondBirthday";
+import { LANDING_THRESHOLD, resolveDisplayAction, usesTitleBarSitAnchor } from "../animations/beyondBirthday";
 import {
   type CompanionBehaviorState,
   type FallVelocity,
@@ -35,6 +35,7 @@ function randomIdleDelay(): number {
 
 interface UseCompanionBehaviorResult {
   action: CompanionAction;
+  displayAction: CompanionAction;
   facing: FacingDirection;
   behaviorState: CompanionBehaviorState;
   dialogueText: string | null;
@@ -56,10 +57,12 @@ interface UseCompanionBehaviorResult {
 
 export function useCompanionBehavior(): UseCompanionBehaviorResult {
   const handleSurfaceLockLostRef = useRef<() => void>(() => {});
+  const usesTitleBarSitAnchorRef = useRef(false);
 
   const {
     anchorX,
     isReady,
+    isSurfaceLocked,
     moveBy,
     setAnchorX,
     setAnchorPosition,
@@ -74,6 +77,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     onSurfaceLockLost: () => {
       handleSurfaceLockLostRef.current();
     },
+    usesTitleBarSitAnchorRef,
   });
 
   const [behaviorState, setBehaviorState] =
@@ -103,6 +107,24 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
   useEffect(() => {
     behaviorStateRef.current = behaviorState;
   }, [behaviorState]);
+
+  const displayAction = useMemo(
+    () => resolveDisplayAction(action, isSurfaceLocked),
+    [action, isSurfaceLocked],
+  );
+
+  usesTitleBarSitAnchorRef.current =
+    isSurfaceLocked && usesTitleBarSitAnchor(displayAction);
+
+  // reclamp Y when switching between standing on the bar vs dangling sit pose
+  useEffect(() => {
+    if (!isSurfaceLocked || !isReady) {
+      return;
+    }
+
+    const anchor = getAnchorPosition();
+    void setAnchorPosition(anchor, "grounded");
+  }, [displayAction, getAnchorPosition, isReady, isSurfaceLocked, setAnchorPosition]);
 
   const startBounce = useCallback(() => {
     setBehaviorState("bouncing");
@@ -565,6 +587,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
 
   return {
     action,
+    displayAction,
     facing,
     behaviorState,
     dialogueText,
