@@ -54,6 +54,7 @@ interface UseCompanionDragOptions {
   ) => Promise<void>;
   onDragStart: () => void;
   onResistEnd: () => void;
+  onDragMove?: (anchor: ScreenPosition) => void;
   onDragEnd: (options: { throwVelocity: FallVelocity; anchor: ScreenPosition }) => void;
 }
 
@@ -70,6 +71,7 @@ export function useCompanionDrag({
   setAnchorPosition,
   onDragStart,
   onResistEnd,
+  onDragMove,
   onDragEnd,
 }: UseCompanionDragOptions): UseCompanionDragResult {
   const [isDragging, setIsDragging] = useState(false);
@@ -88,6 +90,7 @@ export function useCompanionDrag({
   const onDragStartRef = useRef(onDragStart);
   const onResistEndRef = useRef(onResistEnd);
   const onDragEndRef = useRef(onDragEnd);
+  const onDragMoveRef = useRef(onDragMove);
 
   useEffect(() => {
     skipResistDelayRef.current = skipResistDelay;
@@ -96,8 +99,9 @@ export function useCompanionDrag({
   useEffect(() => {
     onDragStartRef.current = onDragStart;
     onResistEndRef.current = onResistEnd;
+    onDragMoveRef.current = onDragMove;
     onDragEndRef.current = onDragEnd;
-  }, [onDragEnd, onDragStart, onResistEnd]);
+  }, [onDragEnd, onDragMove, onDragStart, onResistEnd]);
 
   const clearResistTimeout = useCallback(() => {
     if (resistTimeoutRef.current !== null) {
@@ -200,6 +204,7 @@ export function useCompanionDrag({
 
       updateLeanFromVelocity(velocityX);
       void setAnchorPosition(nextPosition, "walls");
+      onDragMoveRef.current?.(nextPosition);
     },
     [setAnchorPosition, updateLeanFromVelocity],
   );

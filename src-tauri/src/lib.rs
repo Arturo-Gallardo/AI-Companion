@@ -5,7 +5,8 @@ mod tray;
 use companion::{
     cancel_walk_picker, create_companion_menu_window, create_companion_speech_window,
     create_companion_window, create_walk_picker_window, get_desktop_bounds, get_work_area,
-    hide_companion_menu, hide_companion_speech, hide_walk_picker, set_companion_position,
+    get_window_surfaces, hide_companion_menu, hide_companion_speech, hide_walk_picker,
+    hit_title_bar_at, register_excluded_hwnds_from_app, set_companion_position,
     set_companion_speech_size, show_companion_menu, show_companion_speech, show_walk_picker,
     submit_walk_picker_target, take_companion_speech_content,
 };
@@ -23,6 +24,7 @@ pub fn run() {
             create_companion_speech_window(app.handle())?;
             create_companion_menu_window(app.handle())?;
             create_walk_picker_window(app.handle())?;
+            register_excluded_hwnds_from_app(app.handle())?;
             create_tray(app.handle())?;
             Ok(())
         })
@@ -32,6 +34,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_work_area,
             get_desktop_bounds,
+            get_window_surfaces,
+            hit_title_bar_at,
             set_companion_position,
             show_companion_speech,
             hide_companion_speech,

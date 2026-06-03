@@ -7,8 +7,8 @@ import {
   type FallVelocity,
   type ScreenPosition,
 } from "../types/companion";
+import { hitTitleBarAt } from "../services/companionApi";
 import { getDialogueDisplayMs } from "../utils/dialogueDuration";
-import { getDesktopHorizontalRange } from "../utils/monitorBounds";
 import { useCompanionDrag } from "./useCompanionDrag";
 import { useCompanionFall } from "./useCompanionFall";
 import { useCompanionMovement } from "./useCompanionMovement";
@@ -16,6 +16,14 @@ import { useCompanionMovement } from "./useCompanionMovement";
 const MIN_IDLE_MS = 3000;
 const MAX_IDLE_MS = 8000;
 const MIN_WALK_DISTANCE = 80;
+
+// shimeji-style floor idle: sometimes sit instead of walking
+const AUTONOMOUS_SIT_CHANCE = 0.32;
+const MIN_AUTONOMOUS_SIT_MS = 20000;
+const MAX_AUTONOMOUS_SIT_MS = 55000;
+const TITLE_BAR_HOVER_PROBE_MS = 50;
+
+type SittingMode = "manual" | "auto" | null;
 
 function randomBetween(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -31,6 +39,7 @@ interface UseCompanionBehaviorResult {
   behaviorState: CompanionBehaviorState;
   dialogueText: string | null;
   isReady: boolean;
+  showTitleBarLockHint: boolean;
   grabbedLeanFrame: string;
   getAnchorPosition: () => ScreenPosition;
   onWalkTick: (deltaX: number) => void;
@@ -46,8 +55,9 @@ interface UseCompanionBehaviorResult {
 }
 
 export function useCompanionBehavior(): UseCompanionBehaviorResult {
+  const handleSurfaceLockLostRef = useRef<() => void>(() => {});
+
   const {
-    desktopBounds,
     anchorX,
     isReady,
     moveBy,
@@ -57,7 +67,14 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     clampToWalls,
     getFloorYAt,
     getAnchorPosition,
-  } = useCompanionMovement();
+    getHorizontalWalkRange,
+    clearSurfaceLock,
+    tryLockSurfaceAt,
+  } = useCompanionMovement({
+    onSurfaceLockLost: () => {
+      handleSurfaceLockLostRef.current();
+    },
+  });
 
   const [behaviorState, setBehaviorState] =
     useState<CompanionBehaviorState>("idle");
@@ -69,11 +86,15 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
   });
   const [skipResistOnGrab, setSkipResistOnGrab] = useState(false);
   const [dialogueText, setDialogueText] = useState<string | null>(null);
+  const [showTitleBarLockHint, setShowTitleBarLockHint] = useState(false);
 
   const targetXRef = useRef<number | null>(null);
+  const titleBarHoverProbeRef = useRef<number | null>(null);
   const anchorXRef = useRef(anchorX);
   const isDraggingRef = useRef(false);
   const behaviorStateRef = useRef(behaviorState);
+  const dialogueReturnStateRef = useRef<"idle" | "sitting">("idle");
+  const sittingModeRef = useRef<SittingMode>(null);
 
   useEffect(() => {
     anchorXRef.current = anchorX;
@@ -91,6 +112,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
   const returnToIdle = useCallback(() => {
     targetXRef.current = null;
     isDraggingRef.current = false;
+    sittingModeRef.current = null;
     setSkipResistOnGrab(false);
     setDialogueText(null);
     setBehaviorState("idle");
@@ -108,11 +130,23 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
       return;
     }
 
+    if (currentState !== "dialoguing") {
+      dialogueReturnStateRef.current =
+        currentState === "sitting" ? "sitting" : "idle";
+
+      // dialogue during an auto-sit should not snap back into a timed auto-sit
+      if (currentState === "sitting" && sittingModeRef.current === "auto") {
+        sittingModeRef.current = "manual";
+      }
+    }
+
     // clears any in-progress walk target so movement stops immediately
     targetXRef.current = null;
     setDialogueText(text);
     setBehaviorState("dialoguing");
-    setAction("idle");
+    setAction(
+      dialogueReturnStateRef.current === "sitting" ? "sit" : "idle",
+    );
   }, []);
 
   const dismissDialogue = useCallback(() => {
@@ -121,13 +155,21 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     }
 
     setDialogueText(null);
+
+    if (dialogueReturnStateRef.current === "sitting") {
+      setBehaviorState("sitting");
+      setAction("sit");
+      return;
+    }
+
     setBehaviorState("idle");
     setAction("idle");
   }, []);
 
-  const startSitting = useCallback(() => {
+  const startSitting = useCallback((mode: "manual" | "auto") => {
     targetXRef.current = null;
     setDialogueText(null);
+    sittingModeRef.current = mode;
     setBehaviorState("sitting");
     setAction("sit");
   }, []);
@@ -148,7 +190,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
       return;
     }
 
-    startSitting();
+    startSitting("manual");
   }, [returnToIdle, startSitting]);
 
   useEffect(() => {
@@ -165,12 +207,67 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     };
   }, [behaviorState, dialogueText, dismissDialogue]);
 
+  const handleSurfaceLockLost = useCallback(() => {
+    const currentState = behaviorStateRef.current;
+    if (
+      currentState === "dragging" ||
+      currentState === "falling" ||
+      currentState === "bouncing"
+    ) {
+      return;
+    }
+
+    targetXRef.current = null;
+    setFallVelocity({ x: 0, y: 2 });
+    setBehaviorState("falling");
+    setAction("fall");
+  }, []);
+
+  useEffect(() => {
+    handleSurfaceLockLostRef.current = handleSurfaceLockLost;
+  }, [handleSurfaceLockLost]);
+
+  const clearTitleBarHoverProbe = useCallback(() => {
+    if (titleBarHoverProbeRef.current !== null) {
+      window.clearTimeout(titleBarHoverProbeRef.current);
+      titleBarHoverProbeRef.current = null;
+    }
+  }, []);
+
+  const clearTitleBarLockHint = useCallback(() => {
+    clearTitleBarHoverProbe();
+    setShowTitleBarLockHint(false);
+  }, [clearTitleBarHoverProbe]);
+
+  const handleDragMove = useCallback(
+    (anchor: ScreenPosition) => {
+      clearTitleBarHoverProbe();
+
+      titleBarHoverProbeRef.current = window.setTimeout(() => {
+        titleBarHoverProbeRef.current = null;
+
+        void hitTitleBarAt(anchor.x, anchor.y).then((surface) => {
+          setShowTitleBarLockHint(surface !== null);
+        });
+      }, TITLE_BAR_HOVER_PROBE_MS);
+    },
+    [clearTitleBarHoverProbe],
+  );
+
+  useEffect(() => {
+    return () => {
+      clearTitleBarHoverProbe();
+    };
+  }, [clearTitleBarHoverProbe]);
+
   const handleDragStart = useCallback(() => {
     const currentState = behaviorStateRef.current;
     const wasFalling = currentState === "falling";
 
     targetXRef.current = null;
     isDraggingRef.current = true;
+    clearSurfaceLock();
+    clearTitleBarLockHint();
     setDialogueText(null);
 
     if (wasFalling) {
@@ -184,7 +281,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     setSkipResistOnGrab(false);
     setBehaviorState("dragging");
     setAction("resist");
-  }, []);
+  }, [clearSurfaceLock, clearTitleBarLockHint]);
 
   const handleResistEnd = useCallback(() => {
     if (!isDraggingRef.current) {
@@ -204,21 +301,41 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     }) => {
       isDraggingRef.current = false;
       setSkipResistOnGrab(false);
+      clearTitleBarLockHint();
 
-      const floorY = getFloorYAt(anchor.x, anchor.y);
+      void (async () => {
+        const lockedSurface = await tryLockSurfaceAt(anchor.x, anchor.y);
 
-      if (anchor.y >= floorY - LANDING_THRESHOLD) {
-        void setAnchorPosition({ x: anchor.x, y: floorY }, "grounded").then(() => {
+        if (lockedSurface) {
+          await setAnchorPosition(
+            { x: clampAnchorX(anchor.x), y: lockedSurface.top },
+            "grounded",
+          );
           startBounce();
-        });
-        return;
-      }
+          return;
+        }
 
-      setFallVelocity(releaseVelocity);
-      setBehaviorState("falling");
-      setAction("fall");
+        const floorY = getFloorYAt(anchor.x, anchor.y);
+
+        if (anchor.y >= floorY - LANDING_THRESHOLD) {
+          await setAnchorPosition({ x: anchor.x, y: floorY }, "grounded");
+          startBounce();
+          return;
+        }
+
+        setFallVelocity(releaseVelocity);
+        setBehaviorState("falling");
+        setAction("fall");
+      })();
     },
-    [getFloorYAt, setAnchorPosition, startBounce],
+    [
+      clampAnchorX,
+      clearTitleBarLockHint,
+      getFloorYAt,
+      setAnchorPosition,
+      startBounce,
+      tryLockSurfaceAt,
+    ],
   );
 
   const dragEnabled =
@@ -236,6 +353,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     setAnchorPosition,
     onDragStart: handleDragStart,
     onResistEnd: handleResistEnd,
+    onDragMove: handleDragMove,
     onDragEnd: handleDragEnd,
   });
 
@@ -261,6 +379,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     const currentX = anchorXRef.current;
     const direction: FacingDirection = targetX >= currentX ? "right" : "left";
 
+    sittingModeRef.current = null;
     targetXRef.current = targetX;
     setFacing(direction);
     setBehaviorState("walking");
@@ -303,11 +422,12 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
   );
 
   const pickWalkTarget = useCallback(() => {
-    if (!desktopBounds) {
+    const range = getHorizontalWalkRange();
+    if (!range) {
       return null;
     }
 
-    const { minX, maxX } = getDesktopHorizontalRange(desktopBounds);
+    const { minX, maxX } = range;
     let nextTarget = clampAnchorX(randomBetween(minX, maxX));
 
     if (Math.abs(nextTarget - anchorXRef.current) < MIN_WALK_DISTANCE) {
@@ -320,7 +440,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     }
 
     return nextTarget;
-  }, [clampAnchorX, desktopBounds]);
+  }, [clampAnchorX, getHorizontalWalkRange]);
 
   useEffect(() => {
     if (!isReady || behaviorState !== "idle") {
@@ -328,6 +448,15 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     }
 
     const timeoutId = window.setTimeout(() => {
+      if (behaviorStateRef.current !== "idle") {
+        return;
+      }
+
+      if (Math.random() < AUTONOMOUS_SIT_CHANCE) {
+        startSitting("auto");
+        return;
+      }
+
       const target = pickWalkTarget();
       if (target === null) {
         return;
@@ -339,7 +468,32 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [behaviorState, isReady, pickWalkTarget, startWalkingTo]);
+  }, [behaviorState, isReady, pickWalkTarget, startSitting, startWalkingTo]);
+
+  // auto sit eventually stands back up; manual sit stays until the user toggles it
+  useEffect(() => {
+    if (behaviorState !== "sitting" || sittingModeRef.current !== "auto") {
+      return;
+    }
+
+    const sitDurationMs = randomBetween(
+      MIN_AUTONOMOUS_SIT_MS,
+      MAX_AUTONOMOUS_SIT_MS,
+    );
+
+    const timeoutId = window.setTimeout(() => {
+      if (
+        behaviorStateRef.current === "sitting" &&
+        sittingModeRef.current === "auto"
+      ) {
+        returnToIdle();
+      }
+    }, sitDurationMs);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [behaviorState, returnToIdle]);
 
   const finishWalking = useCallback(
     async (targetX: number) => {
@@ -365,13 +519,16 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
         (facing === "left" && nextX <= targetX);
 
       if (reachedTarget) {
-        void finishWalking(targetX);
+        void finishWalking(clampAnchorX(targetX));
         return;
       }
 
-      moveBy(deltaX);
+      const moved = moveBy(deltaX);
+      if (!moved) {
+        void finishWalking(clampAnchorX(currentX));
+      }
     },
-    [behaviorState, facing, finishWalking, moveBy],
+    [behaviorState, clampAnchorX, facing, finishWalking, moveBy],
   );
 
   const onBounceComplete = useCallback(() => {
@@ -412,6 +569,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     behaviorState,
     dialogueText,
     isReady,
+    showTitleBarLockHint,
     grabbedLeanFrame,
     getAnchorPosition,
     onWalkTick,

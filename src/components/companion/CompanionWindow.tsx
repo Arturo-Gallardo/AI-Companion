@@ -9,6 +9,7 @@ import { useCompanionWalkPickerEvents } from "../../hooks/useCompanionWalkPicker
 import { useCompanionMirrorBroadcast } from "../../hooks/useCompanionMirrorBroadcast";
 import { useCompanionSpeechWindow } from "../../hooks/useCompanionSpeechWindow";
 import { CompanionSprite } from "./CompanionSprite";
+import { CompanionSurfaceLockIndicator } from "./CompanionSurfaceLockIndicator";
 
 export function CompanionWindow() {
   const {
@@ -17,6 +18,7 @@ export function CompanionWindow() {
     behaviorState,
     dialogueText,
     isReady,
+    showTitleBarLockHint,
     grabbedLeanFrame,
     getAnchorPosition,
     onWalkTick,
@@ -69,11 +71,14 @@ export function CompanionWindow() {
 
   return (
     <div
-      className={
+      className={`relative overflow-visible ${
         backgroundMode === "gray" ? "bg-neutral-600/45" : "bg-transparent"
-      }
+      }`}
       style={{ width: SPRITE_WIDTH, height: SPRITE_HEIGHT }}
     >
+      <CompanionSurfaceLockIndicator
+        visible={showTitleBarLockHint && behaviorState === "dragging"}
+      />
       <CompanionSprite
         frameSrc={frameSrc}
         facing={facing}

@@ -24,6 +24,14 @@ export interface ScreenPosition {
   y: number;
 }
 
+export interface WindowSurface {
+  hwnd: number;
+  left: number;
+  right: number;
+  top: number;
+  titleBarBottom: number;
+}
+
 export type CompanionBehaviorState =
   | "idle"
   | "walking"

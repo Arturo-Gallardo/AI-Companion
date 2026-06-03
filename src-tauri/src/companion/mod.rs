@@ -1,6 +1,7 @@
 mod menu;
 mod speech;
 mod walk_picker;
+mod window_surfaces;
 
 use serde::Serialize;
 use tauri::window::Color;
@@ -14,6 +15,9 @@ pub use speech::{
 pub use walk_picker::{
     cancel_walk_picker, create_walk_picker_window, hide_walk_picker, show_walk_picker,
     submit_walk_picker_target,
+};
+pub use window_surfaces::{
+    get_window_surfaces, hit_title_bar_at, register_excluded_hwnds_from_app,
 };
 
 pub const SPRITE_WIDTH: f64 = 128.0;
