@@ -1,3 +1,5 @@
+import { SupabaseConnectionTest } from "./SupabaseConnectionTest";
+
 const PLACEHOLDER_SECTIONS = [
   { title: "Companion", description: "Sprite, behavior, and overlay window options" },
   { title: "Appearance", description: "Theme, layout, and display preferences" },
@@ -11,6 +13,10 @@ export function SettingsView() {
     <section className="min-h-0 flex-1 overflow-y-auto px-8 py-8">
       <div className="mx-auto w-full max-w-2xl">
         <h1 className="text-2xl font-bold text-white">Settings</h1>
+
+        <div className="mt-6">
+          <SupabaseConnectionTest />
+        </div>
 
         <div className="mt-8 space-y-3">
           {PLACEHOLDER_SECTIONS.map((section) => (

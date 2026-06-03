@@ -13,7 +13,7 @@ import {
   hitWindowBottomAt,
   hitWindowWallAt,
 } from "../services/companionApi";
-import { getDialogueDisplayMs } from "../utils/dialogueDuration";
+import { DIALOGUE_DISPLAY_MS } from "../utils/dialogueDuration";
 import { hitScreenEdgeWallAt, isScreenEdgeHwnd } from "../utils/screenEdgeWalls";
 import { useCompanionDrag } from "./useCompanionDrag";
 import { useAutonomousDialogue } from "./useAutonomousDialogue";
@@ -299,7 +299,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
 
     const timeoutId = window.setTimeout(() => {
       dismissDialogue();
-    }, getDialogueDisplayMs(dialogueText));
+    }, DIALOGUE_DISPLAY_MS);
 
     return () => {
       window.clearTimeout(timeoutId);
