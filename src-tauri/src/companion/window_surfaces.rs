@@ -32,6 +32,16 @@ pub struct WindowWallHit {
     pub side: WindowWallSide,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowBottomHit {
+    pub hwnd: isize,
+    pub left: i32,
+    pub right: i32,
+    pub top: i32,
+    pub bottom: i32,
+}
+
 static EXCLUDED_HWNDS: LazyLock<Mutex<HashSet<isize>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
 
@@ -45,7 +55,15 @@ const HIT_TOLERANCE_Y_ABOVE: i32 = 24;
 const HIT_TOLERANCE_Y_BELOW: i32 = 56;
 const WALL_HIT_TOLERANCE_X: i32 = 36;
 const WALL_HIT_TOLERANCE_Y: i32 = 32;
+const BOTTOM_HIT_PADDING_X: i32 = 64;
+const BOTTOM_HIT_TOLERANCE_ABOVE: i32 = 12;
+const BOTTOM_HIT_TOLERANCE_BELOW: i32 = 16;
+const MIN_BOTTOM_CRAWL_WIDTH: i32 = 200;
+const MIN_BOTTOM_CRAWL_HEIGHT: i32 = 160;
 const MIN_WALL_CLIMB_HEIGHT: i32 = 160;
+// sprite hangs below the underside anchor (128px tall, anchor at y=48)
+const BOTTOM_CRAWL_SPRITE_REACH_BELOW_ANCHOR: i32 = 80;
+const WORK_AREA_BOTTOM_PADDING: i32 = 8;
 
 pub fn register_excluded_hwnd(hwnd: isize) {
     if hwnd == 0 {
@@ -81,7 +99,26 @@ pub fn register_excluded_hwnds_from_app(app: &tauri::AppHandle) -> Result<(), St
         }
     }
 
+    #[cfg(windows)]
+    register_shell_taskbar_hwnds();
+
     Ok(())
+}
+
+#[cfg(windows)]
+fn register_shell_taskbar_hwnds() {
+    use windows::core::w;
+    use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
+
+    for class in [w!("Shell_TrayWnd"), w!("Shell_SecondaryTrayWnd")] {
+        unsafe {
+            if let Ok(hwnd) = FindWindowW(class, None) {
+                if !hwnd.0.is_null() {
+                    register_excluded_hwnd(hwnd.0 as isize);
+                }
+            }
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -126,6 +163,10 @@ fn surface_from_hwnd(hwnd: windows::Win32::Foundation::HWND) -> Option<WindowSur
 
         if root != hwnd {
             return surface_from_hwnd(root);
+        }
+
+        if is_disallowed_shell_root(hwnd) {
+            return None;
         }
 
         let style = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32;
@@ -365,6 +406,214 @@ pub fn query_hit_window_wall_at(x: f64, y: f64) -> Result<Option<WindowWallHit>,
     Ok(find_nearby_window_wall(&surfaces, x, y))
 }
 
+#[cfg(windows)]
+fn root_hwnd(hwnd: windows::Win32::Foundation::HWND) -> windows::Win32::Foundation::HWND {
+    use windows::Win32::UI::WindowsAndMessaging::{GetAncestor, GA_ROOT};
+
+    unsafe {
+        let root = GetAncestor(hwnd, GA_ROOT);
+        if root.0.is_null() {
+            hwnd
+        } else {
+            root
+        }
+    }
+}
+
+#[cfg(windows)]
+fn window_class_name(hwnd: windows::Win32::Foundation::HWND) -> String {
+    use windows::Win32::UI::WindowsAndMessaging::GetClassNameW;
+
+    let mut buffer = [0u16; 256];
+
+    unsafe {
+        let len = GetClassNameW(hwnd, &mut buffer);
+        if len == 0 {
+            return String::new();
+        }
+
+        String::from_utf16_lossy(&buffer[..len as usize])
+    }
+}
+
+#[cfg(windows)]
+fn is_disallowed_shell_root(hwnd: windows::Win32::Foundation::HWND) -> bool {
+    matches!(
+        window_class_name(hwnd).as_str(),
+        "Shell_TrayWnd" | "Shell_SecondaryTrayWnd"
+    )
+}
+
+#[cfg(windows)]
+fn is_shell_taskbar_hwnd(hwnd: isize) -> bool {
+    let hwnd = windows::Win32::Foundation::HWND(hwnd as *mut std::ffi::c_void);
+    is_disallowed_shell_root(root_hwnd(hwnd))
+}
+
+#[cfg(windows)]
+fn monitor_info_at_point(x: i32, y: i32) -> Option<windows::Win32::Graphics::Gdi::MONITORINFO> {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromPoint, MONITOR_DEFAULTTONEAREST, MONITORINFO};
+
+    let point = POINT { x, y };
+
+    unsafe {
+        let monitor = MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST);
+        let mut info = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+
+        if GetMonitorInfoW(monitor, &mut info).as_bool() {
+            Some(info)
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(windows)]
+fn point_is_in_shell_taskbar_band(x: f64, y: f64) -> bool {
+    let Some(info) = monitor_info_at_point(x.round() as i32, y.round() as i32) else {
+        return false;
+    };
+
+    // taskbar / shell band — includes the work-area bottom edge line
+    y.round() as i32 >= info.rcWork.bottom
+}
+
+#[cfg(windows)]
+fn max_bottom_crawl_anchor_y(surface: &WindowSurface) -> Option<i32> {
+    let center_x = (surface.left + surface.right) / 2;
+    let info = monitor_info_at_point(center_x, surface.bottom.saturating_sub(1))?;
+
+    let clearance =
+        BOTTOM_CRAWL_SPRITE_REACH_BELOW_ANCHOR + WORK_AREA_BOTTOM_PADDING;
+    Some(info.rcWork.bottom - clearance)
+}
+
+#[cfg(windows)]
+fn surface_allows_bottom_crawl(surface: &WindowSurface) -> bool {
+    if is_excluded(surface.hwnd) || is_shell_taskbar_hwnd(surface.hwnd) {
+        return false;
+    }
+
+    let Some(info) = monitor_info_at_point(
+        (surface.left + surface.right) / 2,
+        surface.bottom.saturating_sub(1),
+    ) else {
+        return true;
+    };
+
+    const MONITOR_EDGE_TOLERANCE: i32 = 2;
+    if surface.bottom >= info.rcMonitor.bottom - MONITOR_EDGE_TOLERANCE {
+        return false;
+    }
+
+    // window bottom must sit above the taskbar band, with room for the sprite below the anchor
+    let Some(max_anchor_y) = max_bottom_crawl_anchor_y(surface) else {
+        return true;
+    };
+
+    surface.bottom <= max_anchor_y
+}
+
+#[cfg(windows)]
+fn max_bottom_hit_y(surface: &WindowSurface, x: f64) -> i32 {
+    let mut max_y = surface.bottom + BOTTOM_HIT_TOLERANCE_BELOW;
+    let probe_y = surface.bottom.saturating_sub(1);
+
+    if let Some(info) = monitor_info_at_point(x.round() as i32, probe_y) {
+        max_y = max_y.min(info.rcWork.bottom - 1);
+    }
+
+    if let Some(max_anchor) = max_bottom_crawl_anchor_y(surface) {
+        max_y = max_y.min(max_anchor + BOTTOM_HIT_TOLERANCE_ABOVE);
+    }
+
+    max_y
+}
+
+#[cfg(windows)]
+fn point_hits_window_bottom(surface: &WindowSurface, x: f64, y: f64) -> bool {
+    if !surface_allows_bottom_crawl(surface) || point_is_in_shell_taskbar_band(x, y) {
+        return false;
+    }
+
+    let x_i = x.round() as i32;
+    let y_i = y.round() as i32;
+    let width = surface.right - surface.left;
+    let height = surface.bottom - surface.top;
+
+    if width < MIN_BOTTOM_CRAWL_WIDTH || height < MIN_BOTTOM_CRAWL_HEIGHT {
+        return false;
+    }
+
+    x_i >= surface.left + BOTTOM_HIT_PADDING_X
+        && x_i <= surface.right - BOTTOM_HIT_PADDING_X
+        && y_i >= surface.bottom - BOTTOM_HIT_TOLERANCE_ABOVE
+        && y_i <= max_bottom_hit_y(surface, x)
+}
+
+#[cfg(windows)]
+fn bottom_hit_from_surface(surface: &WindowSurface) -> WindowBottomHit {
+    WindowBottomHit {
+        hwnd: surface.hwnd,
+        left: surface.left,
+        right: surface.right,
+        top: surface.top,
+        bottom: surface.bottom,
+    }
+}
+
+#[cfg(windows)]
+fn find_nearby_window_bottom(surfaces: &[WindowSurface], x: f64, y: f64) -> Option<WindowBottomHit> {
+    let mut best: Option<(WindowBottomHit, i32)> = None;
+
+    for surface in surfaces {
+        if !point_hits_window_bottom(surface, x, y) {
+            continue;
+        }
+
+        let distance = (y.round() as i32 - surface.bottom).abs();
+        let hit = bottom_hit_from_surface(surface);
+
+        if best.as_ref().map(|(_, d)| distance < *d).unwrap_or(true) {
+            best = Some((hit, distance));
+        }
+    }
+
+    best.map(|(hit, _)| hit)
+}
+
+#[cfg(windows)]
+pub fn query_hit_window_bottom_at(x: f64, y: f64) -> Result<Option<WindowBottomHit>, String> {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::UI::WindowsAndMessaging::WindowFromPoint;
+
+    let surfaces = query_window_surfaces()?;
+    let point = POINT {
+        x: x.round() as i32,
+        y: y.round() as i32,
+    };
+
+    unsafe {
+        let hwnd = WindowFromPoint(point);
+        if let Some(surface) = surface_from_hwnd(hwnd) {
+            if surface_allows_bottom_crawl(&surface) && point_hits_window_bottom(&surface, x, y) {
+                return Ok(Some(bottom_hit_from_surface(&surface)));
+            }
+        }
+    }
+
+    Ok(find_nearby_window_bottom(&surfaces, x, y))
+}
+
+#[cfg(not(windows))]
+pub fn query_hit_window_bottom_at(_x: f64, _y: f64) -> Result<Option<WindowBottomHit>, String> {
+    Ok(None)
+}
+
 #[cfg(not(windows))]
 pub fn query_hit_window_wall_at(_x: f64, _y: f64) -> Result<Option<WindowWallHit>, String> {
     Ok(None)
@@ -393,4 +642,9 @@ pub fn get_window_surfaces() -> Result<Vec<WindowSurface>, String> {
 #[tauri::command]
 pub fn hit_title_bar_at(x: f64, y: f64) -> Result<Option<WindowSurface>, String> {
     query_hit_title_bar_at(x, y)
+}
+
+#[tauri::command]
+pub fn hit_window_bottom_at(x: f64, y: f64) -> Result<Option<WindowBottomHit>, String> {
+    query_hit_window_bottom_at(x, y)
 }

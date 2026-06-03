@@ -8,7 +8,11 @@ import {
   type ScreenPosition,
   type SurfaceLock,
 } from "../types/companion";
-import { hitTitleBarAt, hitWindowWallAt } from "../services/companionApi";
+import {
+  hitTitleBarAt,
+  hitWindowBottomAt,
+  hitWindowWallAt,
+} from "../services/companionApi";
 import { getDialogueDisplayMs } from "../utils/dialogueDuration";
 import { hitScreenEdgeWallAt, isScreenEdgeHwnd } from "../utils/screenEdgeWalls";
 import { useCompanionDrag } from "./useCompanionDrag";
@@ -58,6 +62,7 @@ interface UseCompanionBehaviorResult {
   toggleSit: () => void;
   turnAround: () => void;
   walkToAnchorX: (screenX: number) => void;
+  crawlToAnchorX: (screenX: number) => void;
   climbToAnchorY: (screenY: number) => void;
   isFrozen: boolean;
   toggleFreeze: () => void;
@@ -77,6 +82,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     isReady,
     surfaceLock,
     isWallLocked,
+    isUndersideLocked,
     moveBy,
     moveByY,
     setAnchorX,
@@ -120,11 +126,16 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
   const sittingModeRef = useRef<SittingMode>(null);
 
   const isWallLockedRef = useRef(isWallLocked);
+  const isUndersideLockedRef = useRef(isUndersideLocked);
   const isFrozenRef = useRef(isFrozen);
 
   useEffect(() => {
     isWallLockedRef.current = isWallLocked;
   }, [isWallLocked]);
+
+  useEffect(() => {
+    isUndersideLockedRef.current = isUndersideLocked;
+  }, [isUndersideLocked]);
 
   useEffect(() => {
     isFrozenRef.current = isFrozen;
@@ -346,6 +357,15 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     [getAnchorPosition, setAnchorPosition],
   );
 
+  const lockToUndersideAndIdle = useCallback(async () => {
+    targetXRef.current = null;
+    targetYRef.current = null;
+    const anchor = getAnchorPosition();
+    await setAnchorPosition(anchor, "locked");
+    setBehaviorState("idle");
+    setAction("idle");
+  }, [getAnchorPosition, setAnchorPosition]);
+
   const handleDragMove = useCallback(
     (anchor: ScreenPosition) => {
       clearTitleBarHoverProbe();
@@ -365,11 +385,19 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
               return;
             }
 
-            if (desktopBounds) {
-              setShowTitleBarLockHint(
-                hitScreenEdgeWallAt(anchor.x, anchor.y, desktopBounds) !== null,
-              );
-            }
+            void hitWindowBottomAt(anchor.x, anchor.y).then((bottom) => {
+              if (bottom !== null) {
+                setShowTitleBarLockHint(true);
+                return;
+              }
+
+              if (desktopBounds) {
+                setShowTitleBarLockHint(
+                  hitScreenEdgeWallAt(anchor.x, anchor.y, desktopBounds) !==
+                    null,
+                );
+              }
+            });
           });
         });
       }, TITLE_BAR_HOVER_PROBE_MS);
@@ -446,6 +474,11 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
           return;
         }
 
+        if (locked?.kind === "underside") {
+          await lockToUndersideAndIdle();
+          return;
+        }
+
         const floorY = getFloorYAt(anchor.x, anchor.y);
 
         if (anchor.y >= floorY - LANDING_THRESHOLD) {
@@ -467,6 +500,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
       startBounce,
       tryLockSurfaceAt,
       lockToWallAndIdle,
+      lockToUndersideAndIdle,
     ],
   );
 
@@ -520,6 +554,18 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     setAction("walk");
   }, []);
 
+  const startCrawlingTo = useCallback((targetX: number) => {
+    const currentX = anchorXRef.current;
+    const direction: FacingDirection = targetX >= currentX ? "right" : "left";
+
+    sittingModeRef.current = null;
+    targetYRef.current = null;
+    targetXRef.current = targetX;
+    setFacing(direction);
+    setBehaviorState("walking");
+    setAction("climbCeiling");
+  }, []);
+
   const startClimbingTo = useCallback((targetY: number) => {
     const currentY = anchorYRef.current;
 
@@ -553,7 +599,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     (screenX: number) => {
       unfreeze();
 
-      if (isWallLockedRef.current) {
+      if (isWallLockedRef.current || isUndersideLockedRef.current) {
         return;
       }
 
@@ -577,6 +623,36 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
       startWalkingTo(targetX);
     },
     [clampAnchorX, startWalkingTo, unfreeze],
+  );
+
+  const crawlToAnchorX = useCallback(
+    (screenX: number) => {
+      unfreeze();
+
+      if (!isUndersideLockedRef.current) {
+        return;
+      }
+
+      const currentState = behaviorStateRef.current;
+      if (
+        currentState === "dragging" ||
+        currentState === "falling" ||
+        currentState === "bouncing" ||
+        currentState === "climbing"
+      ) {
+        return;
+      }
+
+      if (currentState === "dialoguing") {
+        setDialogueText(null);
+      }
+
+      targetYRef.current = null;
+
+      const targetX = clampAnchorX(screenX);
+      startCrawlingTo(targetX);
+    },
+    [clampAnchorX, startCrawlingTo, unfreeze],
   );
 
   const climbToAnchorY = useCallback(
@@ -644,7 +720,13 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
   }, [clampAnchorX, getHorizontalWalkRange]);
 
   useEffect(() => {
-    if (!isReady || behaviorState !== "idle" || isWallLocked || isFrozen) {
+    if (
+      !isReady ||
+      behaviorState !== "idle" ||
+      isWallLocked ||
+      isUndersideLocked ||
+      isFrozen
+    ) {
       return;
     }
 
@@ -673,10 +755,46 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     behaviorState,
     isFrozen,
     isReady,
+    isUndersideLocked,
     isWallLocked,
     pickWalkTarget,
     startSitting,
     startWalkingTo,
+  ]);
+
+  // window bottom crawl — horizontal autonomous moves
+  useEffect(() => {
+    if (!isReady || behaviorState !== "idle" || !isUndersideLocked || isFrozen) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      if (
+        behaviorStateRef.current !== "idle" ||
+        isFrozenRef.current ||
+        !isUndersideLockedRef.current
+      ) {
+        return;
+      }
+
+      const target = pickWalkTarget();
+      if (target === null) {
+        return;
+      }
+
+      startCrawlingTo(target);
+    }, randomIdleDelay());
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    behaviorState,
+    isFrozen,
+    isReady,
+    isUndersideLocked,
+    pickWalkTarget,
+    startCrawlingTo,
   ]);
 
   // on a window wall, sometimes climb up or down
@@ -782,6 +900,11 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
 
   const tryFinishWalkAtWall = useCallback(
     async (fallbackX: number) => {
+      if (isUndersideLockedRef.current) {
+        await finishWalking(fallbackX);
+        return;
+      }
+
       const anchor = getAnchorPosition();
       const locked = await tryLockSurfaceAt(anchor.x, anchor.y);
 
@@ -876,9 +999,15 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
         return;
       }
 
-      void showCompanionMenu(event.screenX, event.screenY, isWallLocked, isFrozen);
+      void showCompanionMenu(
+        event.screenX,
+        event.screenY,
+        isWallLocked,
+        isUndersideLocked,
+        isFrozen,
+      );
     },
-    [canOpenContextMenu, isFrozen, isWallLocked],
+    [canOpenContextMenu, isFrozen, isUndersideLocked, isWallLocked],
   );
 
   return {
@@ -901,6 +1030,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     toggleSit,
     turnAround,
     walkToAnchorX,
+    crawlToAnchorX,
     climbToAnchorY,
     isFrozen,
     toggleFreeze,

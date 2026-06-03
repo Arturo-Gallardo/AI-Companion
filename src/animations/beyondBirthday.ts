@@ -16,6 +16,9 @@ export const SPRITE_ANCHOR = { x: 64, y: 128 } as const;
 export const TITLE_BAR_SIT_ANCHOR = { x: 64, y: 112 } as const;
 export const TITLE_BAR_SIT_Y_OFFSET = SPRITE_ANCHOR.y - TITLE_BAR_SIT_ANCHOR.y;
 
+// window underside crawl — same sprites as shimeji ceiling crawl (shime23–25)
+export const UNDERSIDE_GRAB_ANCHOR = { x: 64, y: 48 } as const;
+
 // ~25ms per tick matches the shimeji engine cadence
 export const TICK_INTERVAL_MS = 25;
 
@@ -99,6 +102,28 @@ export const CLIMB_WALL_DOWN_ANIMATION: AnimationDefinition = {
   velocity: { x: 0, y: 2 },
 };
 
+export const GRAB_UNDERSIDE_ANIMATION: AnimationDefinition = {
+  frames: ["shime23.png"],
+  tickDuration: 250,
+  velocity: { x: 0, y: 0 },
+};
+
+export const CRAWL_UNDERSIDE_ANIMATION: AnimationDefinition = {
+  frames: [
+    "shime25.png",
+    "shime25.png",
+    "shime23.png",
+    "shime24.png",
+    "shime24.png",
+    "shime24.png",
+    "shime23.png",
+    "shime25.png",
+  ],
+  tickDuration: 4,
+  frameTickDurations: [16, 4, 4, 16, 4, 4, 4, 4],
+  velocity: { x: -2, y: 0 },
+};
+
 export function getFrameTickDuration(
   animation: AnimationDefinition,
   frameIndex: number,
@@ -142,6 +167,8 @@ const ANIMATION_BY_ACTION: Record<CompanionAction, AnimationDefinition> = {
   grabWall: GRAB_WALL_ANIMATION,
   climbWall: CLIMB_WALL_UP_ANIMATION,
   climbWallDown: CLIMB_WALL_DOWN_ANIMATION,
+  grabCeiling: GRAB_UNDERSIDE_ANIMATION,
+  climbCeiling: CRAWL_UNDERSIDE_ANIMATION,
   grabbed: GRABBED_ANIMATION,
   resist: RESIST_ANIMATION,
   fall: FALL_ANIMATION,
@@ -150,6 +177,10 @@ const ANIMATION_BY_ACTION: Record<CompanionAction, AnimationDefinition> = {
 
 export function usesTitleBarSitAnchor(action: CompanionAction): boolean {
   return action === "sitOnBar" || action === "dangleOnBar";
+}
+
+export function usesUndersideGrabAnchor(action: CompanionAction): boolean {
+  return action === "grabCeiling" || action === "climbCeiling";
 }
 
 // when locked to a surface, swap floor actions for perched / wall poses
@@ -173,11 +204,29 @@ export function resolveDisplayAction(
     return "grabWall";
   }
 
+  if (surfaceLock.kind === "underside") {
+    if (action === "climbCeiling") {
+      return action;
+    }
+
+    if (action === "idle" || action === "walk") {
+      return "grabCeiling";
+    }
+  }
+
   return action;
 }
 
 export function getSpriteAnchorForAction(action: CompanionAction): SpriteAnchor {
-  return usesTitleBarSitAnchor(action) ? TITLE_BAR_SIT_ANCHOR : SPRITE_ANCHOR;
+  if (usesTitleBarSitAnchor(action)) {
+    return TITLE_BAR_SIT_ANCHOR;
+  }
+
+  if (usesUndersideGrabAnchor(action)) {
+    return UNDERSIDE_GRAB_ANCHOR;
+  }
+
+  return SPRITE_ANCHOR;
 }
 
 export function getAnimationForAction(

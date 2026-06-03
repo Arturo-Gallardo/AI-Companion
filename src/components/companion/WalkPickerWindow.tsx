@@ -64,10 +64,15 @@ export function WalkPickerWindow() {
     }
 
     const anchorX = toAnchorX(event.clientX, bounds);
-    void submitTargetPicker("walk", anchorX, 0);
+    void submitTargetPicker(mode === "crawl" ? "crawl" : "walk", anchorX, 0);
   };
 
-  const cursorClass = mode === "climb" ? "cursor-ns-resize" : "cursor-crosshair";
+  const cursorClass =
+    mode === "climb"
+      ? "cursor-ns-resize"
+      : mode === "crawl"
+        ? "cursor-ew-resize"
+        : "cursor-crosshair";
 
   return (
     <div

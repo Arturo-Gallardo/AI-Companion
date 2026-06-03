@@ -25,6 +25,8 @@ export type CompanionAction =
   | "grabWall"
   | "climbWall"
   | "climbWallDown"
+  | "grabCeiling"
+  | "climbCeiling"
   | "grabbed"
   | "resist"
   | "fall"

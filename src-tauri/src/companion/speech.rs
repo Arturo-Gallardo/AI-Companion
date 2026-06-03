@@ -4,7 +4,10 @@ use serde::Serialize;
 use tauri::window::Color;
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 
-use super::{query_desktop_bounds, MonitorWorkArea, ANCHOR_X, SPRITE_HEIGHT, SPRITE_WIDTH};
+use super::{
+    query_desktop_bounds, MonitorWorkArea, ANCHOR_X, DEFAULT_ANCHOR_Y_OFFSET, SPRITE_HEIGHT,
+    SPRITE_WIDTH,
+};
 
 pub const SPEECH_WINDOW_LABEL: &str = "companion-speech";
 pub const COMPANION_SPEECH_CONTENT_EVENT: &str = "companion-speech-content";
@@ -132,6 +135,7 @@ struct ResolvedSpeechBounds {
 fn resolve_speech_bounds(
     anchor_x: f64,
     anchor_y: f64,
+    anchor_y_offset: f64,
     speech_width: f64,
     speech_height: f64,
 ) -> Result<ResolvedSpeechBounds, String> {
@@ -146,7 +150,8 @@ fn resolve_speech_bounds(
 
     let sprite_left = anchor_x - ANCHOR_X;
     let sprite_right = sprite_left + SPRITE_WIDTH;
-    let sprite_top = anchor_y - SPRITE_HEIGHT;
+    let sprite_top = anchor_y - anchor_y_offset;
+    let sprite_bottom = sprite_top + SPRITE_HEIGHT;
 
     let above_y = sprite_top - SPEECH_BUBBLE_GAP - speech_height;
     let above_x = anchor_x - speech_width / 2.0;
@@ -179,7 +184,7 @@ fn resolve_speech_bounds(
         SpeechBubblePlacement::Right
     };
 
-    let side_y = anchor_y - SPRITE_HEIGHT / 2.0 - speech_height / 2.0;
+    let side_y = (sprite_top + sprite_bottom) / 2.0 - speech_height / 2.0;
     let side_x = match placement {
         SpeechBubblePlacement::Left => sprite_left - SPEECH_SIDE_GAP - speech_width,
         SpeechBubblePlacement::Right => sprite_right + SPEECH_SIDE_GAP,
@@ -221,12 +226,19 @@ fn apply_companion_speech_bounds(
     app: &AppHandle,
     anchor_x: f64,
     anchor_y: f64,
+    anchor_y_offset: f64,
     speech_width: f64,
     speech_height: f64,
     show_window: bool,
 ) -> Result<SpeechBubblePlacement, String> {
     let previous = read_speech_state()?.placement;
-    let resolved = resolve_speech_bounds(anchor_x, anchor_y, speech_width, speech_height)?;
+    let resolved = resolve_speech_bounds(
+        anchor_x,
+        anchor_y,
+        anchor_y_offset,
+        speech_width,
+        speech_height,
+    )?;
 
     let window = app
         .get_webview_window(SPEECH_WINDOW_LABEL)
@@ -287,11 +299,16 @@ pub fn create_companion_speech_window(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-pub fn sync_companion_speech_position(app: &AppHandle, anchor_x: f64, anchor_y: f64) -> Result<(), String> {
+pub fn sync_companion_speech_position(
+    app: &AppHandle,
+    anchor_x: f64,
+    anchor_y: f64,
+    anchor_y_offset: f64,
+) -> Result<(), String> {
     let state = read_speech_state()?;
 
     if !state.visible {
-        return Ok(());
+      return Ok(());
     }
 
     if app.get_webview_window(SPEECH_WINDOW_LABEL).is_none() {
@@ -307,6 +324,7 @@ pub fn sync_companion_speech_position(app: &AppHandle, anchor_x: f64, anchor_y: 
         app,
         anchor_x,
         anchor_y,
+        anchor_y_offset,
         state.width,
         state.height,
         false,
@@ -354,6 +372,7 @@ pub fn show_companion_speech(
         &app,
         anchor_x,
         anchor_y,
+        DEFAULT_ANCHOR_Y_OFFSET,
         SPEECH_INITIAL_WIDTH,
         SPEECH_INITIAL_HEIGHT,
         true,
@@ -414,6 +433,7 @@ pub fn set_companion_speech_size(app: AppHandle, width: f64, height: f64) -> Res
         &app,
         state.anchor_x,
         state.anchor_y,
+        DEFAULT_ANCHOR_Y_OFFSET,
         width,
         height,
         true,

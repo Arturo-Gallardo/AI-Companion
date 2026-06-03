@@ -17,17 +17,23 @@ pub use walk_picker::{
     submit_target_picker,
 };
 pub use window_surfaces::{
-    get_window_surfaces, hit_title_bar_at, hit_window_wall_at, register_excluded_hwnds_from_app,
+    get_window_surfaces, hit_title_bar_at, hit_window_bottom_at, hit_window_wall_at,
+    register_excluded_hwnds_from_app,
 };
 
 pub const SPRITE_WIDTH: f64 = 128.0;
 pub const SPRITE_HEIGHT: f64 = 128.0;
 pub const ANCHOR_X: f64 = 64.0;
+pub const DEFAULT_ANCHOR_Y_OFFSET: f64 = 128.0;
 
-pub(crate) fn companion_window_position(anchor_x: f64, anchor_y: f64) -> (i32, i32) {
+pub(crate) fn companion_window_position(
+    anchor_x: f64,
+    anchor_y: f64,
+    anchor_y_offset: f64,
+) -> (i32, i32) {
     (
         (anchor_x - ANCHOR_X) as i32,
-        (anchor_y - SPRITE_HEIGHT) as i32,
+        (anchor_y - anchor_y_offset) as i32,
     )
 }
 
@@ -199,18 +205,24 @@ pub fn get_desktop_bounds() -> Result<DesktopBounds, String> {
 }
 
 #[tauri::command]
-pub fn set_companion_position(app: AppHandle, x: f64, y: f64) -> Result<(), String> {
+pub fn set_companion_position(
+    app: AppHandle,
+    x: f64,
+    y: f64,
+    anchor_y_offset: Option<f64>,
+) -> Result<(), String> {
     let window = app
         .get_webview_window("companion")
         .ok_or_else(|| "companion window not found".to_string())?;
 
-    let (window_x, window_y) = companion_window_position(x, y);
+    let anchor_offset = anchor_y_offset.unwrap_or(DEFAULT_ANCHOR_Y_OFFSET);
+    let (window_x, window_y) = companion_window_position(x, y, anchor_offset);
 
     window
         .set_position(PhysicalPosition::new(window_x, window_y))
         .map_err(|error| format!("failed to move companion window: {error}"))?;
 
-    let _ = sync_companion_speech_position(&app, x, y);
+    let _ = sync_companion_speech_position(&app, x, y, anchor_offset);
 
     Ok(())
 }
@@ -229,7 +241,8 @@ pub fn create_companion_window(app: &AppHandle) -> Result<(), String> {
 
     let start_x = rightmost.x as f64 + rightmost.width as f64 - ANCHOR_X;
     let start_y = rightmost.y as f64 + rightmost.height as f64;
-    let (window_x, window_y) = companion_window_position(start_x, start_y);
+    let (window_x, window_y) =
+        companion_window_position(start_x, start_y, DEFAULT_ANCHOR_Y_OFFSET);
 
     let companion_window = WebviewWindowBuilder::new(app, "companion", WebviewUrl::default())
         .title("Companion")

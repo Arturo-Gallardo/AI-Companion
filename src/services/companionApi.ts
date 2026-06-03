@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   DesktopBounds,
   ScreenPosition,
+  WindowBottomHit,
   WindowSurface,
   WindowWallHit,
   WorkArea,
@@ -15,8 +16,15 @@ export async function getDesktopBounds(): Promise<DesktopBounds> {
   return invoke<DesktopBounds>("get_desktop_bounds");
 }
 
-export async function setCompanionPosition(position: ScreenPosition): Promise<void> {
-  await invoke("set_companion_position", { x: position.x, y: position.y });
+export async function setCompanionPosition(
+  position: ScreenPosition,
+  anchorYOffset = 128,
+): Promise<void> {
+  await invoke("set_companion_position", {
+    x: position.x,
+    y: position.y,
+    anchorYOffset,
+  });
 }
 
 export async function getWindowSurfaces(): Promise<WindowSurface[]> {
@@ -35,4 +43,11 @@ export async function hitWindowWallAt(
   y: number,
 ): Promise<WindowWallHit | null> {
   return invoke<WindowWallHit | null>("hit_window_wall_at", { x, y });
+}
+
+export async function hitWindowBottomAt(
+  x: number,
+  y: number,
+): Promise<WindowBottomHit | null> {
+  return invoke<WindowBottomHit | null>("hit_window_bottom_at", { x, y });
 }

@@ -6,12 +6,14 @@ import {
 
 interface UseCompanionWalkPickerEventsOptions {
   onSelectWalkTarget: (anchorX: number) => void;
+  onSelectCrawlTarget: (anchorX: number) => void;
   onSelectClimbTarget: (anchorY: number) => void;
   onCancel: () => void;
 }
 
 export function useCompanionWalkPickerEvents({
   onSelectWalkTarget,
+  onSelectCrawlTarget,
   onSelectClimbTarget,
   onCancel,
 }: UseCompanionWalkPickerEventsOptions): void {
@@ -22,6 +24,11 @@ export function useCompanionWalkPickerEvents({
     void listenTargetPickerSelected(({ mode, anchorX, anchorY }) => {
       if (mode === "climb") {
         onSelectClimbTarget(anchorY);
+        return;
+      }
+
+      if (mode === "crawl") {
+        onSelectCrawlTarget(anchorX);
         return;
       }
 
@@ -40,5 +47,5 @@ export function useCompanionWalkPickerEvents({
       unlistenSelect?.();
       unlistenCancel?.();
     };
-  }, [onCancel, onSelectClimbTarget, onSelectWalkTarget]);
+  }, [onCancel, onSelectClimbTarget, onSelectCrawlTarget, onSelectWalkTarget]);
 }

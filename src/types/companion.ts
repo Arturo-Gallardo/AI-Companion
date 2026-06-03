@@ -44,7 +44,19 @@ export interface WindowWallHit {
   side: WindowWallSide;
 }
 
-export type SurfaceLockKind = "titleBar" | "wallLeft" | "wallRight";
+export interface WindowBottomHit {
+  hwnd: number;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+export type SurfaceLockKind =
+  | "titleBar"
+  | "wallLeft"
+  | "wallRight"
+  | "underside";
 
 export interface SurfaceLock {
   hwnd: number;

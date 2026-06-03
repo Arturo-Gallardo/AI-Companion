@@ -20,6 +20,10 @@ Copy these files from your Shimeji pack into this folder:
 **Wall climb (shime12–14):**
 - `shime12.png`, `shime13.png`, `shime14.png` — grab/climb window walls
 
+**Window bottom crawl (shime23–25):**
+- `shime23.png` — grab underside of a window
+- `shime24.png`, `shime25.png` — crawl along the window bottom edge
+
 **Title bar sit (shime31–33):**
 - `shime31.png` — sitting on a window edge, legs down (still)
 - `shime32.png`, `shime33.png` — leg swing frames for the dangle loop

@@ -32,6 +32,7 @@ export function CompanionWindow() {
     toggleSit,
     turnAround,
     walkToAnchorX,
+    crawlToAnchorX,
     climbToAnchorY,
     isFrozen,
     toggleFreeze,
@@ -52,6 +53,7 @@ export function CompanionWindow() {
   });
   useCompanionWalkPickerEvents({
     onSelectWalkTarget: walkToAnchorX,
+    onSelectCrawlTarget: crawlToAnchorX,
     onSelectClimbTarget: climbToAnchorY,
     onCancel: () => {},
   });

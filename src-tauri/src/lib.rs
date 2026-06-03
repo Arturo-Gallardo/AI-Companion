@@ -6,7 +6,8 @@ use companion::{
     cancel_walk_picker, create_companion_menu_window, create_companion_speech_window,
     create_companion_window, create_walk_picker_window, get_desktop_bounds, get_work_area,
     get_window_surfaces, hide_companion_menu, hide_companion_speech, hide_walk_picker,
-    hit_title_bar_at, hit_window_wall_at, register_excluded_hwnds_from_app, set_companion_position,
+    hit_title_bar_at, hit_window_bottom_at, hit_window_wall_at,
+    register_excluded_hwnds_from_app, set_companion_position,
     set_companion_speech_size, show_companion_menu, show_companion_speech, show_walk_picker,
     submit_target_picker, take_companion_speech_content,
 };
@@ -37,6 +38,7 @@ pub fn run() {
             get_window_surfaces,
             hit_title_bar_at,
             hit_window_wall_at,
+            hit_window_bottom_at,
             set_companion_position,
             show_companion_speech,
             hide_companion_speech,

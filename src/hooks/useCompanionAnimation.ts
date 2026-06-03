@@ -76,7 +76,10 @@ export function useCompanionAnimation({
       const animation = getAnimationForAction(activeAction);
       const directionMultiplier = facingRef.current === "right" ? -1 : 1;
 
-      if (activeAction === "walk" && onTickRef.current) {
+      if (
+        (activeAction === "walk" || activeAction === "climbCeiling") &&
+        onTickRef.current
+      ) {
         onTickRef.current(animation.velocity.x * directionMultiplier);
       }
 

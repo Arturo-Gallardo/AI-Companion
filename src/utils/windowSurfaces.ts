@@ -7,6 +7,7 @@ import type {
   MonitorWorkArea,
   SurfaceLock,
   SurfaceLockKind,
+  WindowBottomHit,
   WindowSurface,
   WindowWallHit,
   WindowWallSide,
@@ -35,6 +36,10 @@ export function isWallLock(kind: SurfaceLockKind): boolean {
   return kind === "wallLeft" || kind === "wallRight";
 }
 
+export function isUndersideLock(kind: SurfaceLockKind): boolean {
+  return kind === "underside";
+}
+
 export function surfaceLockFromTitleBar(hwnd: number): SurfaceLock {
   return { hwnd, kind: "titleBar" };
 }
@@ -43,6 +48,21 @@ export function surfaceLockFromWall(wall: WindowWallHit): SurfaceLock {
   return {
     hwnd: wall.hwnd,
     kind: wall.side === "left" ? "wallLeft" : "wallRight",
+  };
+}
+
+export function surfaceLockFromUnderside(hit: WindowBottomHit): SurfaceLock {
+  return { hwnd: hit.hwnd, kind: "underside" };
+}
+
+export function windowSurfaceFromBottomHit(hit: WindowBottomHit): WindowSurface {
+  return {
+    hwnd: hit.hwnd,
+    left: hit.left,
+    right: hit.right,
+    top: hit.top,
+    bottom: hit.bottom,
+    titleBarBottom: hit.top + 32,
   };
 }
 
@@ -71,7 +91,7 @@ export function windowSurfaceFromWallHit(wall: WindowWallHit): WindowSurface {
 }
 
 export function toLockedSurfaceSnapshot(
-  surface: WindowSurface | WindowWallHit,
+  surface: WindowSurface | WindowWallHit | WindowBottomHit,
 ): LockedSurfaceSnapshot {
   return {
     hwnd: surface.hwnd,
@@ -165,6 +185,35 @@ export function clampWallAnchorPosition(
   return {
     x: getWallAnchorX(surface, kind),
     y: clampWallAnchorY(surface, anchorY),
+  };
+}
+
+export function getUndersideHorizontalRange(surface: WindowSurface): {
+  minX: number;
+  maxX: number;
+} {
+  return getSurfaceHorizontalRange(surface);
+}
+
+export function getUndersideAnchorY(surface: WindowSurface): number {
+  return surface.bottom;
+}
+
+export function clampUndersideAnchorX(
+  surface: WindowSurface,
+  anchorX: number,
+): number {
+  const { minX, maxX } = getUndersideHorizontalRange(surface);
+  return clampXToRange(anchorX, minX, maxX);
+}
+
+export function clampUndersideAnchorPosition(
+  surface: WindowSurface,
+  anchorX: number,
+): { x: number; y: number } {
+  return {
+    x: clampUndersideAnchorX(surface, anchorX),
+    y: getUndersideAnchorY(surface),
   };
 }
 

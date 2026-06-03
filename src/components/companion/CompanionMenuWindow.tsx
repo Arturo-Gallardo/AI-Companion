@@ -14,6 +14,7 @@ const STATIC_MENU_ITEMS: { action: CompanionMenuAction; label: string }[] = [
 
 export function CompanionMenuWindow() {
   const [wallLocked, setWallLocked] = useState(false);
+  const [undersideLocked, setUndersideLocked] = useState(false);
   const [frozen, setFrozen] = useState(false);
 
   useEffect(() => {
@@ -31,8 +32,13 @@ export function CompanionMenuWindow() {
       });
 
     void listenCompanionMenuConfig(
-      ({ wallLocked: nextWallLocked, frozen: nextFrozen }) => {
+      ({
+        wallLocked: nextWallLocked,
+        undersideLocked: nextUndersideLocked,
+        frozen: nextFrozen,
+      }) => {
         setWallLocked(nextWallLocked);
+        setUndersideLocked(nextUndersideLocked);
         setFrozen(nextFrozen);
       },
     ).then((cleanup) => {
@@ -46,16 +52,18 @@ export function CompanionMenuWindow() {
   }, []);
 
   const menuItems = useMemo(() => {
-    const travelItem = wallLocked
-      ? { action: "climbTo" as const, label: "Climb to…" }
-      : { action: "walkTo" as const, label: "Walk to…" };
+    const travelItem = undersideLocked
+      ? { action: "crawlTo" as const, label: "Crawl to…" }
+      : wallLocked
+        ? { action: "climbTo" as const, label: "Climb to…" }
+        : { action: "walkTo" as const, label: "Walk to…" };
 
     const freezeItem = frozen
       ? { action: "toggleFreeze" as const, label: "Unfreeze" }
       : { action: "toggleFreeze" as const, label: "Freeze" };
 
     return [travelItem, ...STATIC_MENU_ITEMS, freezeItem];
-  }, [frozen, wallLocked]);
+  }, [frozen, undersideLocked, wallLocked]);
 
   const handleAction = (action: CompanionMenuAction) => {
     void hideCompanionMenu().then(() => {

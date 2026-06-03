@@ -11,6 +11,7 @@ pub const COMPANION_MENU_CONFIG_EVENT: &str = "companion-menu-config";
 #[serde(rename_all = "camelCase")]
 pub struct CompanionMenuConfigPayload {
     pub wall_locked: bool,
+    pub underside_locked: bool,
     pub frozen: bool,
 }
 
@@ -93,6 +94,7 @@ pub fn show_companion_menu(
     screen_x: f64,
     screen_y: f64,
     wall_locked: bool,
+    underside_locked: bool,
     frozen: bool,
 ) -> Result<(), String> {
     let window = app
@@ -106,6 +108,7 @@ pub fn show_companion_menu(
             COMPANION_MENU_CONFIG_EVENT,
             CompanionMenuConfigPayload {
                 wall_locked,
+                underside_locked,
                 frozen,
             },
         )

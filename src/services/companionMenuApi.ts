@@ -13,9 +13,16 @@ export async function showCompanionMenu(
   screenX: number,
   screenY: number,
   wallLocked: boolean,
+  undersideLocked: boolean,
   frozen: boolean,
 ): Promise<void> {
-  await invoke("show_companion_menu", { screenX, screenY, wallLocked, frozen });
+  await invoke("show_companion_menu", {
+    screenX,
+    screenY,
+    wallLocked,
+    undersideLocked,
+    frozen,
+  });
 }
 
 export async function hideCompanionMenu(): Promise<void> {

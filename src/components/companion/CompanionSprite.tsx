@@ -36,7 +36,9 @@ function shouldFlipSprite(
     action !== "walk" &&
     action !== "sit" &&
     action !== "sitOnBar" &&
-    action !== "dangleOnBar"
+    action !== "dangleOnBar" &&
+    action !== "grabCeiling" &&
+    action !== "climbCeiling"
   ) {
     return false;
   }
