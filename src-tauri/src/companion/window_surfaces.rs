@@ -10,7 +10,26 @@ pub struct WindowSurface {
     pub left: i32,
     pub right: i32,
     pub top: i32,
+    pub bottom: i32,
     pub title_bar_bottom: i32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WindowWallSide {
+    Left,
+    Right,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowWallHit {
+    pub hwnd: isize,
+    pub left: i32,
+    pub right: i32,
+    pub top: i32,
+    pub bottom: i32,
+    pub side: WindowWallSide,
 }
 
 static EXCLUDED_HWNDS: LazyLock<Mutex<HashSet<isize>>> =
@@ -24,6 +43,9 @@ const TITLE_BAR_BAND_MAX: i32 = 48;
 const HIT_TOLERANCE_X: i32 = 32;
 const HIT_TOLERANCE_Y_ABOVE: i32 = 24;
 const HIT_TOLERANCE_Y_BELOW: i32 = 56;
+const WALL_HIT_TOLERANCE_X: i32 = 36;
+const WALL_HIT_TOLERANCE_Y: i32 = 32;
+const MIN_WALL_CLIMB_HEIGHT: i32 = 160;
 
 pub fn register_excluded_hwnd(hwnd: isize) {
     if hwnd == 0 {
@@ -136,6 +158,7 @@ fn surface_from_hwnd(hwnd: windows::Win32::Foundation::HWND) -> Option<WindowSur
             left: rect.left,
             right: rect.right,
             top,
+            bottom: rect.bottom,
             title_bar_bottom,
         })
     }
@@ -236,14 +259,130 @@ pub fn query_hit_title_bar_at(x: f64, y: f64) -> Result<Option<WindowSurface>, S
     Ok(find_nearby_title_bar(&surfaces, x, y))
 }
 
+#[cfg(windows)]
+fn point_hits_left_wall(surface: &WindowSurface, x: f64, y: f64) -> bool {
+    let x = x.round() as i32;
+    let y = y.round() as i32;
+    let height = surface.bottom - surface.top;
+
+    if height < MIN_WALL_CLIMB_HEIGHT {
+        return false;
+    }
+
+    x >= surface.left - WALL_HIT_TOLERANCE_X
+        && x <= surface.left + WALL_HIT_TOLERANCE_X
+        && y >= surface.top - WALL_HIT_TOLERANCE_Y
+        && y <= surface.bottom + WALL_HIT_TOLERANCE_Y
+}
+
+#[cfg(windows)]
+fn point_hits_right_wall(surface: &WindowSurface, x: f64, y: f64) -> bool {
+    let x = x.round() as i32;
+    let y = y.round() as i32;
+    let height = surface.bottom - surface.top;
+
+    if height < MIN_WALL_CLIMB_HEIGHT {
+        return false;
+    }
+
+    x >= surface.right - WALL_HIT_TOLERANCE_X
+        && x <= surface.right + WALL_HIT_TOLERANCE_X
+        && y >= surface.top - WALL_HIT_TOLERANCE_Y
+        && y <= surface.bottom + WALL_HIT_TOLERANCE_Y
+}
+
+#[cfg(windows)]
+fn distance_to_vertical_edge(surface: &WindowSurface, side: WindowWallSide, x: i32) -> i32 {
+    match side {
+        WindowWallSide::Left => (x - surface.left).abs(),
+        WindowWallSide::Right => (x - surface.right).abs(),
+    }
+}
+
+#[cfg(windows)]
+fn wall_hit_from_surface(surface: &WindowSurface, side: WindowWallSide) -> WindowWallHit {
+    WindowWallHit {
+        hwnd: surface.hwnd,
+        left: surface.left,
+        right: surface.right,
+        top: surface.top,
+        bottom: surface.bottom,
+        side,
+    }
+}
+
+#[cfg(windows)]
+fn find_nearby_window_wall(surfaces: &[WindowSurface], x: f64, y: f64) -> Option<WindowWallHit> {
+    let x_i = x.round() as i32;
+
+    let mut best: Option<(WindowWallHit, i32)> = None;
+
+    for surface in surfaces {
+        if point_hits_left_wall(surface, x, y) {
+            let distance = distance_to_vertical_edge(surface, WindowWallSide::Left, x_i);
+            let hit = wall_hit_from_surface(surface, WindowWallSide::Left);
+            if best.as_ref().map(|(_, d)| distance < *d).unwrap_or(true) {
+                best = Some((hit, distance));
+            }
+        }
+
+        if point_hits_right_wall(surface, x, y) {
+            let distance = distance_to_vertical_edge(surface, WindowWallSide::Right, x_i);
+            let hit = wall_hit_from_surface(surface, WindowWallSide::Right);
+            if best.as_ref().map(|(_, d)| distance < *d).unwrap_or(true) {
+                best = Some((hit, distance));
+            }
+        }
+    }
+
+    best.map(|(hit, _)| hit)
+}
+
+#[cfg(windows)]
+pub fn query_hit_window_wall_at(x: f64, y: f64) -> Result<Option<WindowWallHit>, String> {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::UI::WindowsAndMessaging::WindowFromPoint;
+
+    let surfaces = query_window_surfaces()?;
+    let point = POINT {
+        x: x.round() as i32,
+        y: y.round() as i32,
+    };
+
+    unsafe {
+        let hwnd = WindowFromPoint(point);
+        if let Some(surface) = surface_from_hwnd(hwnd) {
+            if point_hits_left_wall(&surface, x, y) {
+                return Ok(Some(wall_hit_from_surface(&surface, WindowWallSide::Left)));
+            }
+
+            if point_hits_right_wall(&surface, x, y) {
+                return Ok(Some(wall_hit_from_surface(&surface, WindowWallSide::Right)));
+            }
+        }
+    }
+
+    Ok(find_nearby_window_wall(&surfaces, x, y))
+}
+
 #[cfg(not(windows))]
-pub fn query_window_surfaces() -> Result<Vec<WindowSurface>, String> {
-    Ok(Vec::new())
+pub fn query_hit_window_wall_at(_x: f64, _y: f64) -> Result<Option<WindowWallHit>, String> {
+    Ok(None)
 }
 
 #[cfg(not(windows))]
 pub fn query_hit_title_bar_at(_x: f64, _y: f64) -> Result<Option<WindowSurface>, String> {
     Ok(None)
+}
+
+#[cfg(not(windows))]
+pub fn query_window_surfaces() -> Result<Vec<WindowSurface>, String> {
+    Ok(Vec::new())
+}
+
+#[tauri::command]
+pub fn hit_window_wall_at(x: f64, y: f64) -> Result<Option<WindowWallHit>, String> {
+    query_hit_window_wall_at(x, y)
 }
 
 #[tauri::command]

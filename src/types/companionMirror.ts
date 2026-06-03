@@ -9,6 +9,7 @@ export interface CompanionMirrorState {
   isDragging: boolean;
   behaviorState: CompanionBehaviorState;
   dialogueText: string | null;
+  isFrozen: boolean;
 }
 
 export const DEFAULT_COMPANION_MIRROR_STATE: CompanionMirrorState = {
@@ -18,4 +19,5 @@ export const DEFAULT_COMPANION_MIRROR_STATE: CompanionMirrorState = {
   isDragging: false,
   behaviorState: "idle",
   dialogueText: null,
+  isFrozen: false,
 };

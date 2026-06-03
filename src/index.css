@@ -35,39 +35,110 @@ html.walk-picker-root #root {
   overflow: hidden;
 }
 
-/* duration matches COMPANION_SPEECH_ANIMATION_MS */
-@keyframes companion-speech-in {
-  from {
-    opacity: 0;
-    transform: scale(0.88) translateY(6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-@keyframes companion-speech-out {
-  from {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-
-  to {
-    opacity: 0;
-    transform: scale(0.88) translateY(6px);
-  }
-}
-
-.companion-speech-bubble-stage {
+.companion-speech-bubble-stage--above {
   transform-origin: bottom center;
 }
 
-.companion-speech-bubble-enter {
-  animation: companion-speech-in 180ms ease-out forwards;
+.companion-speech-bubble-stage--left {
+  transform-origin: center right;
 }
 
-.companion-speech-bubble-exit {
-  animation: companion-speech-out 180ms ease-in forwards;
+.companion-speech-bubble-stage--right {
+  transform-origin: center left;
+}
+
+.companion-speech-bubble-enter--above {
+  animation: companion-speech-in-above 180ms ease-out forwards;
+}
+
+.companion-speech-bubble-exit--above {
+  animation: companion-speech-out-above 180ms ease-in forwards;
+}
+
+.companion-speech-bubble-enter--left {
+  animation: companion-speech-in-left 180ms ease-out forwards;
+}
+
+.companion-speech-bubble-exit--left {
+  animation: companion-speech-out-left 180ms ease-in forwards;
+}
+
+.companion-speech-bubble-enter--right {
+  animation: companion-speech-in-right 180ms ease-out forwards;
+}
+
+.companion-speech-bubble-exit--right {
+  animation: companion-speech-out-right 180ms ease-in forwards;
+}
+
+@keyframes companion-speech-in-above {
+  from {
+    opacity: 0;
+    transform: scale(0.88) translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes companion-speech-out-above {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.88) translateY(6px);
+  }
+}
+
+@keyframes companion-speech-in-left {
+  from {
+    opacity: 0;
+    transform: scale(0.88) translateX(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+  }
+}
+
+@keyframes companion-speech-out-left {
+  from {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.88) translateX(6px);
+  }
+}
+
+@keyframes companion-speech-in-right {
+  from {
+    opacity: 0;
+    transform: scale(0.88) translateX(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+  }
+}
+
+@keyframes companion-speech-out-right {
+  from {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.88) translateX(-6px);
+  }
 }

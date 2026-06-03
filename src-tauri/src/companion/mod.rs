@@ -14,10 +14,10 @@ pub use speech::{
 };
 pub use walk_picker::{
     cancel_walk_picker, create_walk_picker_window, hide_walk_picker, show_walk_picker,
-    submit_walk_picker_target,
+    submit_target_picker,
 };
 pub use window_surfaces::{
-    get_window_surfaces, hit_title_bar_at, register_excluded_hwnds_from_app,
+    get_window_surfaces, hit_title_bar_at, hit_window_wall_at, register_excluded_hwnds_from_app,
 };
 
 pub const SPRITE_WIDTH: f64 = 128.0;

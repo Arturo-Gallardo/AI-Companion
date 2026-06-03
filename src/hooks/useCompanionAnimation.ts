@@ -13,6 +13,7 @@ interface UseCompanionAnimationOptions {
   facing: FacingDirection;
   grabbedLeanFrame?: string;
   onTick?: (deltaX: number) => void;
+  onClimbTick?: (deltaY: number) => void;
   onBounceComplete?: () => void;
 }
 
@@ -32,6 +33,7 @@ export function useCompanionAnimation({
   facing,
   grabbedLeanFrame = DEFAULT_GRABBED_LEAN_FRAME,
   onTick,
+  onClimbTick,
   onBounceComplete,
 }: UseCompanionAnimationOptions): UseCompanionAnimationResult {
   const [frameIndex, setFrameIndex] = useState(0);
@@ -41,6 +43,7 @@ export function useCompanionAnimation({
   const actionRef = useRef(action);
   const facingRef = useRef(facing);
   const onTickRef = useRef(onTick);
+  const onClimbTickRef = useRef(onClimbTick);
   const onBounceCompleteRef = useRef(onBounceComplete);
 
   useEffect(() => {
@@ -50,8 +53,9 @@ export function useCompanionAnimation({
 
   useEffect(() => {
     onTickRef.current = onTick;
+    onClimbTickRef.current = onClimbTick;
     onBounceCompleteRef.current = onBounceComplete;
-  }, [onBounceComplete, onTick]);
+  }, [onBounceComplete, onClimbTick, onTick]);
 
   useEffect(() => {
     frameIndexRef.current = 0;
@@ -74,6 +78,13 @@ export function useCompanionAnimation({
 
       if (activeAction === "walk" && onTickRef.current) {
         onTickRef.current(animation.velocity.x * directionMultiplier);
+      }
+
+      if (
+        (activeAction === "climbWall" || activeAction === "climbWallDown") &&
+        onClimbTickRef.current
+      ) {
+        onClimbTickRef.current(animation.velocity.y);
       }
 
       const frameDurationMs =

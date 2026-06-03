@@ -4,6 +4,7 @@ import {
   COMPANION_SPEECH_ANIMATE_OUT_EVENT,
   COMPANION_SPEECH_ANIMATION_MS,
 } from "../constants/companionSpeechAnimation";
+import type { SpeechBubblePlacement } from "../types/companionSpeech";
 
 export type CompanionSpeechAnimationPhase =
   | "hidden"
@@ -13,11 +14,32 @@ export type CompanionSpeechAnimationPhase =
 
 interface UseCompanionSpeechBubbleAnimationResult {
   animationClass: string | undefined;
+  stageClassName: string;
   canMeasureSize: boolean;
+}
+
+function getStageClassName(placement: SpeechBubblePlacement): string {
+  return `companion-speech-bubble-stage companion-speech-bubble-stage--${placement}`;
+}
+
+function getAnimationClass(
+  phase: CompanionSpeechAnimationPhase,
+  placement: SpeechBubblePlacement,
+): string | undefined {
+  if (phase === "entering") {
+    return `companion-speech-bubble-enter companion-speech-bubble-enter--${placement}`;
+  }
+
+  if (phase === "exiting") {
+    return `companion-speech-bubble-exit companion-speech-bubble-exit--${placement}`;
+  }
+
+  return undefined;
 }
 
 export function useCompanionSpeechBubbleAnimation(
   text: string | null,
+  placement: SpeechBubblePlacement,
 ): UseCompanionSpeechBubbleAnimationResult {
   const [phase, setPhase] = useState<CompanionSpeechAnimationPhase>("hidden");
 
@@ -65,14 +87,10 @@ export function useCompanionSpeechBubbleAnimation(
     };
   }, []);
 
-  const animationClass =
-    phase === "entering"
-      ? "companion-speech-bubble-enter"
-      : phase === "exiting"
-        ? "companion-speech-bubble-exit"
-        : undefined;
+  const animationClass = getAnimationClass(phase, placement);
+  const stageClassName = getStageClassName(placement);
 
   const canMeasureSize = phase === "visible" || phase === "exiting";
 
-  return { animationClass, canMeasureSize };
+  return { animationClass, stageClassName, canMeasureSize };
 }

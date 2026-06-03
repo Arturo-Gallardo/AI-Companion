@@ -1,24 +1,31 @@
 import { useEffect } from "react";
 import {
+  listenTargetPickerSelected,
   listenWalkPickerCancel,
-  listenWalkPickerSelected,
 } from "../services/companionWalkPickerApi";
 
 interface UseCompanionWalkPickerEventsOptions {
-  onSelectTarget: (anchorX: number) => void;
+  onSelectWalkTarget: (anchorX: number) => void;
+  onSelectClimbTarget: (anchorY: number) => void;
   onCancel: () => void;
 }
 
 export function useCompanionWalkPickerEvents({
-  onSelectTarget,
+  onSelectWalkTarget,
+  onSelectClimbTarget,
   onCancel,
 }: UseCompanionWalkPickerEventsOptions): void {
   useEffect(() => {
     let unlistenSelect: (() => void) | undefined;
     let unlistenCancel: (() => void) | undefined;
 
-    void listenWalkPickerSelected(({ anchorX }) => {
-      onSelectTarget(anchorX);
+    void listenTargetPickerSelected(({ mode, anchorX, anchorY }) => {
+      if (mode === "climb") {
+        onSelectClimbTarget(anchorY);
+        return;
+      }
+
+      onSelectWalkTarget(anchorX);
     }).then((cleanup) => {
       unlistenSelect = cleanup;
     });
@@ -33,5 +40,5 @@ export function useCompanionWalkPickerEvents({
       unlistenSelect?.();
       unlistenCancel?.();
     };
-  }, [onCancel, onSelectTarget]);
+  }, [onCancel, onSelectClimbTarget, onSelectWalkTarget]);
 }

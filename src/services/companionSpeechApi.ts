@@ -5,15 +5,22 @@ import {
   COMPANION_SPEECH_ANIMATION_MS,
 } from "../constants/companionSpeechAnimation";
 import type { ScreenPosition } from "../types/companion";
+import type { SpeechBubblePlacement } from "../types/companionSpeech";
 
 export const COMPANION_SPEECH_WINDOW_LABEL = "companion-speech";
 export const COMPANION_SPEECH_CONTENT_EVENT = "companion-speech-content";
 export const COMPANION_SPEECH_DISMISS_EVENT = "companion-speech-dismiss";
+export const COMPANION_SPEECH_PLACEMENT_EVENT = "companion-speech-placement";
 
 export interface CompanionSpeechContentPayload {
   text: string;
   anchorX: number;
   anchorY: number;
+  placement: SpeechBubblePlacement;
+}
+
+export interface CompanionSpeechPlacementPayload {
+  placement: SpeechBubblePlacement;
 }
 
 export async function takeCompanionSpeechContent(): Promise<string | null> {

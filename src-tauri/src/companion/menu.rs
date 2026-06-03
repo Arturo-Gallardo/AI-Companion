@@ -1,12 +1,21 @@
+use serde::Serialize;
 use tauri::window::Color;
-use tauri::{AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 
 use super::{query_desktop_bounds, MonitorWorkArea};
 
 pub const MENU_WINDOW_LABEL: &str = "companion-menu";
+pub const COMPANION_MENU_CONFIG_EVENT: &str = "companion-menu-config";
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompanionMenuConfigPayload {
+    pub wall_locked: bool,
+    pub frozen: bool,
+}
 
 const MENU_WIDTH: f64 = 152.0;
-const MENU_HEIGHT: f64 = 118.0;
+const MENU_HEIGHT: f64 = 154.0;
 
 fn monitor_at_point<'a>(
     x: f64,
@@ -79,12 +88,32 @@ pub fn create_companion_menu_window(app: &AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn show_companion_menu(app: AppHandle, screen_x: f64, screen_y: f64) -> Result<(), String> {
+pub fn show_companion_menu(
+    app: AppHandle,
+    screen_x: f64,
+    screen_y: f64,
+    wall_locked: bool,
+    frozen: bool,
+) -> Result<(), String> {
     let window = app
         .get_webview_window(MENU_WINDOW_LABEL)
         .ok_or_else(|| "companion menu window not found".to_string())?;
 
     let (window_x, window_y) = clamp_menu_position(screen_x, screen_y)?;
+
+    window
+        .emit(
+            COMPANION_MENU_CONFIG_EVENT,
+            CompanionMenuConfigPayload {
+                wall_locked,
+                frozen,
+            },
+        )
+        .map_err(|error| format!("failed to emit companion menu config: {error}"))?;
+
+    window
+        .set_size(tauri::LogicalSize::new(MENU_WIDTH, MENU_HEIGHT))
+        .map_err(|error| format!("failed to resize companion menu window: {error}"))?;
 
     window
         .set_position(PhysicalPosition::new(window_x, window_y))

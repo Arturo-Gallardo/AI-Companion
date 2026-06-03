@@ -3,6 +3,7 @@ import type {
   DesktopBounds,
   ScreenPosition,
   WindowSurface,
+  WindowWallHit,
   WorkArea,
 } from "../types/companion";
 
@@ -27,4 +28,11 @@ export async function hitTitleBarAt(
   y: number,
 ): Promise<WindowSurface | null> {
   return invoke<WindowSurface | null>("hit_title_bar_at", { x, y });
+}
+
+export async function hitWindowWallAt(
+  x: number,
+  y: number,
+): Promise<WindowWallHit | null> {
+  return invoke<WindowWallHit | null>("hit_window_wall_at", { x, y });
 }

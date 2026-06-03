@@ -6,9 +6,9 @@ use companion::{
     cancel_walk_picker, create_companion_menu_window, create_companion_speech_window,
     create_companion_window, create_walk_picker_window, get_desktop_bounds, get_work_area,
     get_window_surfaces, hide_companion_menu, hide_companion_speech, hide_walk_picker,
-    hit_title_bar_at, register_excluded_hwnds_from_app, set_companion_position,
+    hit_title_bar_at, hit_window_wall_at, register_excluded_hwnds_from_app, set_companion_position,
     set_companion_speech_size, show_companion_menu, show_companion_speech, show_walk_picker,
-    submit_walk_picker_target, take_companion_speech_content,
+    submit_target_picker, take_companion_speech_content,
 };
 use main_window::{configure_main_window, handle_window_event};
 use tray::create_tray;
@@ -36,6 +36,7 @@ pub fn run() {
             get_desktop_bounds,
             get_window_surfaces,
             hit_title_bar_at,
+            hit_window_wall_at,
             set_companion_position,
             show_companion_speech,
             hide_companion_speech,
@@ -45,7 +46,7 @@ pub fn run() {
             hide_companion_menu,
             show_walk_picker,
             hide_walk_picker,
-            submit_walk_picker_target,
+            submit_target_picker,
             cancel_walk_picker,
         ])
         .build(tauri::generate_context!())

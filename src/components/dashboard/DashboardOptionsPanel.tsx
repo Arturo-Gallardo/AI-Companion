@@ -1,4 +1,5 @@
 import { emitDialogueStart } from "../../services/companionDialogue";
+import { emitFreezeToggle } from "../../services/companionFreeze";
 import { emitSitToggle } from "../../services/companionSit";
 import { useCompanionMirrorState } from "../../hooks/useCompanionMirrorState";
 import { pickRandomMotivationalQuote } from "../../utils/pickRandomQuote";
@@ -7,6 +8,7 @@ const BLOCKED_COMPANION_COMMAND_STATES = new Set([
   "dragging",
   "falling",
   "bouncing",
+  "climbing",
 ]);
 
 export function DashboardOptionsPanel() {
@@ -16,6 +18,7 @@ export function DashboardOptionsPanel() {
   );
   const isSitting = mirrorState.behaviorState === "sitting";
   const canToggleSit = isSitting || !isCommandBlocked;
+  const isFrozen = mirrorState.isFrozen;
 
   const handleDialogueClick = () => {
     if (isCommandBlocked) {
@@ -31,6 +34,10 @@ export function DashboardOptionsPanel() {
     }
 
     void emitSitToggle();
+  };
+
+  const handleFreezeClick = () => {
+    void emitFreezeToggle();
   };
 
   return (
@@ -59,16 +66,25 @@ export function DashboardOptionsPanel() {
             {isSitting ? "Stand" : "Sit"}
           </button>
 
-          {["Sleep", "Mute"].map((label) => (
-            <button
-              key={label}
-              type="button"
-              disabled
-              className="flex flex-1 items-center justify-center rounded-md border-2 border-neutral-600/70 text-lg text-neutral-200 disabled:cursor-default"
-            >
-              {label}
-            </button>
-          ))}
+          <button
+            type="button"
+            onClick={handleFreezeClick}
+            className={`flex flex-1 items-center justify-center rounded-md border-2 text-lg text-neutral-200 hover:border-neutral-400/80 hover:text-white ${
+              isFrozen
+                ? "border-neutral-400/90 text-white"
+                : "border-neutral-600/70"
+            }`}
+          >
+            {isFrozen ? "Unfreeze" : "Freeze"}
+          </button>
+
+          <button
+            type="button"
+            disabled
+            className="flex flex-1 items-center justify-center rounded-md border-2 border-neutral-600/70 text-lg text-neutral-200 disabled:cursor-default"
+          >
+            Mute
+          </button>
         </div>
       </div>
     </section>

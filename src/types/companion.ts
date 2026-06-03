@@ -29,12 +29,32 @@ export interface WindowSurface {
   left: number;
   right: number;
   top: number;
+  bottom: number;
   titleBarBottom: number;
+}
+
+export type WindowWallSide = "left" | "right";
+
+export interface WindowWallHit {
+  hwnd: number;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  side: WindowWallSide;
+}
+
+export type SurfaceLockKind = "titleBar" | "wallLeft" | "wallRight";
+
+export interface SurfaceLock {
+  hwnd: number;
+  kind: SurfaceLockKind;
 }
 
 export type CompanionBehaviorState =
   | "idle"
   | "walking"
+  | "climbing"
   | "sitting"
   | "dragging"
   | "falling"
@@ -43,7 +63,7 @@ export type CompanionBehaviorState =
 
 // gap between sprite top and speech window bottom
 export const SPEECH_BUBBLE_GAP = 4;
-export type AnchorClampMode = "walls" | "grounded";
+export type AnchorClampMode = "walls" | "grounded" | "locked";
 
 export interface DragOffset {
   x: number;

@@ -3,12 +3,14 @@ import type { RefObject } from "react";
 import {
   getDesktopBounds,
   hitTitleBarAt,
+  hitWindowWallAt,
   setCompanionPosition,
 } from "../services/companionApi";
 import type {
   AnchorClampMode,
   DesktopBounds,
   ScreenPosition,
+  SurfaceLock,
   WindowSurface,
 } from "../types/companion";
 import {
@@ -17,12 +19,25 @@ import {
   getRightmostMonitorFloorStart,
 } from "../utils/monitorBounds";
 import {
+  hitScreenEdgeWallAt,
+  isScreenEdgeHwnd,
+  screenEdgeSurfaceFromWallHit,
+} from "../utils/screenEdgeWalls";
+import {
+  clampWallAnchorPosition,
+  clampWallAnchorY,
   clampXToRange,
   findSurfaceByHwnd,
   getSurfaceHorizontalRange,
+  getWallVerticalRange,
   hasLockedSurfaceMoved,
+  isTitleBarLock,
+  isWallLock,
   resolveFloorYAt,
+  surfaceLockFromTitleBar,
+  surfaceLockFromWall,
   toLockedSurfaceSnapshot,
+  windowSurfaceFromWallHit,
   type LockedSurfaceSnapshot,
 } from "../utils/windowSurfaces";
 import { useCompanionWindowSurfaces } from "./useCompanionWindowSurfaces";
@@ -37,8 +52,11 @@ interface UseCompanionMovementResult {
   anchorX: number;
   anchorY: number;
   isReady: boolean;
+  surfaceLock: SurfaceLock | null;
   isSurfaceLocked: boolean;
+  isWallLocked: boolean;
   moveBy: (deltaX: number) => boolean;
+  moveByY: (deltaY: number) => boolean;
   setAnchorX: (nextX: number) => Promise<void>;
   setAnchorPosition: (
     position: ScreenPosition,
@@ -50,8 +68,9 @@ interface UseCompanionMovementResult {
   getFloorYAt: (x: number, y: number) => number;
   getAnchorPosition: () => ScreenPosition;
   getHorizontalWalkRange: () => { minX: number; maxX: number } | null;
+  getVerticalClimbRange: () => { minY: number; maxY: number } | null;
   clearSurfaceLock: () => void;
-  tryLockSurfaceAt: (x: number, y: number) => Promise<WindowSurface | null>;
+  tryLockSurfaceAt: (x: number, y: number) => Promise<SurfaceLock | null>;
 }
 
 export function useCompanionMovement(
@@ -70,12 +89,13 @@ export function useCompanionMovement(
   const [anchorX, setAnchorXState] = useState(0);
   const [anchorY, setAnchorYState] = useState(0);
   const [isReady, setIsReady] = useState(false);
-  const [lockedHwnd, setLockedHwnd] = useState<number | null>(null);
+  const [surfaceLock, setSurfaceLock] = useState<SurfaceLock | null>(null);
 
   const anchorRef = useRef<ScreenPosition>({ x: 0, y: 0 });
   const desktopBoundsRef = useRef<DesktopBounds | null>(null);
-  const lockedHwndRef = useRef<number | null>(null);
+  const surfaceLockRef = useRef<SurfaceLock | null>(null);
   const lockedSurfaceSnapshotRef = useRef<LockedSurfaceSnapshot | null>(null);
+  const lockedSurfaceCacheRef = useRef<WindowSurface | null>(null);
 
   const { surfaces, surfacesRef } = useCompanionWindowSurfaces(isReady);
 
@@ -84,19 +104,38 @@ export function useCompanionMovement(
   }, [desktopBounds]);
 
   useEffect(() => {
-    lockedHwndRef.current = lockedHwnd;
-  }, [lockedHwnd]);
+    surfaceLockRef.current = surfaceLock;
+  }, [surfaceLock]);
 
   const getLockedSurface = useCallback((): WindowSurface | null => {
-    return findSurfaceByHwnd(surfacesRef.current, lockedHwndRef.current);
+    const lock = surfaceLockRef.current;
+    if (!lock) {
+      return null;
+    }
+
+    if (isScreenEdgeHwnd(lock.hwnd)) {
+      return lockedSurfaceCacheRef.current;
+    }
+
+    const hwnd = lock.hwnd;
+    const fromPoll = findSurfaceByHwnd(surfacesRef.current, hwnd);
+
+    if (fromPoll) {
+      lockedSurfaceCacheRef.current = fromPoll;
+      return fromPoll;
+    }
+
+    return lockedSurfaceCacheRef.current;
   }, [surfacesRef]);
 
   const getHorizontalBounds = useCallback((): {
     minX: number;
     maxX: number;
   } | null => {
+    const lock = surfaceLockRef.current;
     const lockedSurface = getLockedSurface();
-    if (lockedSurface) {
+
+    if (lockedSurface && lock && isTitleBarLock(lock.kind)) {
       return getSurfaceHorizontalRange(lockedSurface);
     }
 
@@ -108,20 +147,24 @@ export function useCompanionMovement(
     return getDesktopHorizontalRange(bounds);
   }, [getLockedSurface]);
 
-  const resolveFloorYAtPosition = useCallback((x: number, y: number): number => {
-    const bounds = desktopBoundsRef.current;
-    if (!bounds) {
-      return y;
-    }
+  const resolveFloorYAtPosition = useCallback(
+    (x: number, y: number): number => {
+      const bounds = desktopBoundsRef.current;
+      if (!bounds) {
+        return y;
+      }
 
-    return resolveFloorYAt(
-      x,
-      y,
-      bounds.monitors,
-      getLockedSurface(),
-      usesTitleBarSitAnchorRef?.current ?? false,
-    );
-  }, [getLockedSurface, usesTitleBarSitAnchorRef]);
+      return resolveFloorYAt(
+        x,
+        y,
+        bounds.monitors,
+        getLockedSurface(),
+        surfaceLockRef.current,
+        usesTitleBarSitAnchorRef?.current ?? false,
+      );
+    },
+    [getLockedSurface, usesTitleBarSitAnchorRef],
+  );
 
   const clampHorizontalX = useCallback(
     (x: number): number => {
@@ -154,8 +197,15 @@ export function useCompanionMovement(
     [clampHorizontalX],
   );
 
-  const clampGroundedPosition = useCallback(
+  const clampLockedPosition = useCallback(
     (x: number, y: number): ScreenPosition => {
+      const lock = surfaceLockRef.current;
+      const lockedSurface = getLockedSurface();
+
+      if (lockedSurface && lock && isWallLock(lock.kind)) {
+        return clampWallAnchorPosition(lockedSurface, lock.kind, y);
+      }
+
       const walled = clampToWallsPosition(x, y);
 
       return {
@@ -163,7 +213,25 @@ export function useCompanionMovement(
         y: resolveFloorYAtPosition(walled.x, walled.y),
       };
     },
-    [clampToWallsPosition, resolveFloorYAtPosition],
+    [clampToWallsPosition, getLockedSurface, resolveFloorYAtPosition],
+  );
+
+  const clampGroundedPosition = useCallback(
+    (x: number, y: number): ScreenPosition => {
+      const lock = surfaceLockRef.current;
+
+      if (lock && isWallLock(lock.kind)) {
+        return clampLockedPosition(x, y);
+      }
+
+      const walled = clampToWallsPosition(x, y);
+
+      return {
+        x: walled.x,
+        y: resolveFloorYAtPosition(walled.x, walled.y),
+      };
+    },
+    [clampLockedPosition, clampToWallsPosition, resolveFloorYAtPosition],
   );
 
   const clampAnchorX = useCallback(
@@ -178,7 +246,9 @@ export function useCompanionMovement(
       const nextPosition =
         mode === "walls"
           ? clampToWallsPosition(position.x, position.y)
-          : clampGroundedPosition(position.x, position.y);
+          : mode === "locked"
+            ? clampLockedPosition(position.x, position.y)
+            : clampGroundedPosition(position.x, position.y);
 
       anchorRef.current = nextPosition;
       setAnchorXState(nextPosition.x);
@@ -186,27 +256,56 @@ export function useCompanionMovement(
 
       await setCompanionPosition(nextPosition);
     },
-    [clampGroundedPosition, clampToWallsPosition],
+    [clampGroundedPosition, clampLockedPosition, clampToWallsPosition],
   );
 
   const clearSurfaceLock = useCallback(() => {
-    lockedHwndRef.current = null;
+    surfaceLockRef.current = null;
     lockedSurfaceSnapshotRef.current = null;
-    setLockedHwnd(null);
+    lockedSurfaceCacheRef.current = null;
+    setSurfaceLock(null);
   }, []);
 
   const tryLockSurfaceAt = useCallback(
-    async (x: number, y: number): Promise<WindowSurface | null> => {
+    async (x: number, y: number): Promise<SurfaceLock | null> => {
       try {
-        const surface = await hitTitleBarAt(x, y);
-        if (!surface) {
-          return null;
+        const titleBar = await hitTitleBarAt(x, y);
+        if (titleBar) {
+          const lock = surfaceLockFromTitleBar(titleBar.hwnd);
+          lockedSurfaceCacheRef.current = titleBar;
+          surfaceLockRef.current = lock;
+          lockedSurfaceSnapshotRef.current = toLockedSurfaceSnapshot(titleBar);
+          setSurfaceLock(lock);
+          return lock;
         }
 
-        lockedHwndRef.current = surface.hwnd;
-        lockedSurfaceSnapshotRef.current = toLockedSurfaceSnapshot(surface);
-        setLockedHwnd(surface.hwnd);
-        return surface;
+        const wall = await hitWindowWallAt(x, y);
+        if (wall) {
+          const wallSurface = windowSurfaceFromWallHit(wall);
+          const lock = surfaceLockFromWall(wall);
+          lockedSurfaceCacheRef.current = wallSurface;
+          surfaceLockRef.current = lock;
+          lockedSurfaceSnapshotRef.current = toLockedSurfaceSnapshot(wallSurface);
+          setSurfaceLock(lock);
+          return lock;
+        }
+
+        const bounds = desktopBoundsRef.current;
+        if (bounds) {
+          const screenEdge = hitScreenEdgeWallAt(x, y, bounds);
+          if (screenEdge) {
+            const edgeSurface = screenEdgeSurfaceFromWallHit(screenEdge);
+            const lock = surfaceLockFromWall(screenEdge);
+            lockedSurfaceCacheRef.current = edgeSurface;
+            surfaceLockRef.current = lock;
+            lockedSurfaceSnapshotRef.current =
+              toLockedSurfaceSnapshot(edgeSurface);
+            setSurfaceLock(lock);
+            return lock;
+          }
+        }
+
+        return null;
       } catch {
         return null;
       }
@@ -215,13 +314,24 @@ export function useCompanionMovement(
   );
 
   useEffect(() => {
-    if (lockedHwnd === null) {
+    if (surfaceLock === null) {
       lockedSurfaceSnapshotRef.current = null;
       return;
     }
 
-    const surface = findSurfaceByHwnd(surfaces, lockedHwnd);
-    if (!surface) {
+    // monitor edges don't move — lock stays until drag clears it
+    if (isScreenEdgeHwnd(surfaceLock.hwnd)) {
+      return;
+    }
+
+    const lockedSurface = findSurfaceByHwnd(surfaces, surfaceLock.hwnd);
+
+    // wait for the first surface poll before deciding the host window is gone
+    if (!lockedSurface) {
+      if (surfaces.length === 0) {
+        return;
+      }
+
       clearSurfaceLock();
       onSurfaceLockLostRef.current?.();
       return;
@@ -229,18 +339,18 @@ export function useCompanionMovement(
 
     const previousSnapshot = lockedSurfaceSnapshotRef.current;
     if (!previousSnapshot) {
-      lockedSurfaceSnapshotRef.current = toLockedSurfaceSnapshot(surface);
+      lockedSurfaceSnapshotRef.current = toLockedSurfaceSnapshot(lockedSurface);
       return;
     }
 
-    if (hasLockedSurfaceMoved(previousSnapshot, surface)) {
+    if (hasLockedSurfaceMoved(previousSnapshot, lockedSurface)) {
       clearSurfaceLock();
       onSurfaceLockLostRef.current?.();
       return;
     }
 
-    lockedSurfaceSnapshotRef.current = toLockedSurfaceSnapshot(surface);
-  }, [clearSurfaceLock, lockedHwnd, surfaces]);
+    lockedSurfaceSnapshotRef.current = toLockedSurfaceSnapshot(lockedSurface);
+  }, [clearSurfaceLock, surfaceLock, surfaces]);
 
   useEffect(() => {
     let cancelled = false;
@@ -277,6 +387,11 @@ export function useCompanionMovement(
 
   const moveBy = useCallback(
     (deltaX: number): boolean => {
+      const lock = surfaceLockRef.current;
+      if (lock && isWallLock(lock.kind)) {
+        return false;
+      }
+
       const current = anchorRef.current;
       const nextX = clampAnchorX(current.x + deltaX);
 
@@ -295,6 +410,32 @@ export function useCompanionMovement(
       return true;
     },
     [applyAnchorPosition, clampAnchorX],
+  );
+
+  const moveByY = useCallback(
+    (deltaY: number): boolean => {
+      const lock = surfaceLockRef.current;
+      const lockedSurface = getLockedSurface();
+
+      if (!lock || !lockedSurface || !isWallLock(lock.kind)) {
+        return false;
+      }
+
+      const current = anchorRef.current;
+      const nextY = clampWallAnchorY(lockedSurface, current.y + deltaY);
+
+      if (nextY === current.y && Math.abs(deltaY) > 0) {
+        return false;
+      }
+
+      void applyAnchorPosition(
+        clampWallAnchorPosition(lockedSurface, lock.kind, nextY),
+        "locked",
+      );
+
+      return true;
+    },
+    [applyAnchorPosition, getLockedSurface],
   );
 
   const setAnchorX = useCallback(
@@ -322,13 +463,32 @@ export function useCompanionMovement(
     return getHorizontalBounds();
   }, [getHorizontalBounds]);
 
+  const getVerticalClimbRange = useCallback((): {
+    minY: number;
+    maxY: number;
+  } | null => {
+    const lock = surfaceLockRef.current;
+    const lockedSurface = getLockedSurface();
+
+    if (!lock || !lockedSurface || !isWallLock(lock.kind)) {
+      return null;
+    }
+
+    return getWallVerticalRange(lockedSurface);
+  }, [getLockedSurface]);
+
   return {
     desktopBounds,
     anchorX,
     anchorY,
     isReady,
-    isSurfaceLocked: lockedHwnd !== null,
+    surfaceLock,
+    isSurfaceLocked: surfaceLock !== null,
+    isWallLocked:
+      surfaceLock !== null &&
+      (surfaceLock.kind === "wallLeft" || surfaceLock.kind === "wallRight"),
     moveBy,
+    moveByY,
     setAnchorX,
     setAnchorPosition,
     clampAnchorX,
@@ -337,6 +497,7 @@ export function useCompanionMovement(
     getFloorYAt: resolveFloorYAtPosition,
     getAnchorPosition,
     getHorizontalWalkRange,
+    getVerticalClimbRange,
     clearSurfaceLock,
     tryLockSurfaceAt,
   };

@@ -1,11 +1,13 @@
 import { useEffect } from "react";
 import { listenCompanionMenuAction } from "../services/companionMenuApi";
-import { showWalkPicker } from "../services/companionWalkPickerApi";
+import { showTargetPicker } from "../services/companionWalkPickerApi";
 import type { CompanionMenuAction } from "../types/companionMenu";
 
 interface UseCompanionMenuEventsOptions {
   onTurnAround: () => void;
   onSit: () => void;
+  onToggleFreeze: () => void;
+  onUnfreeze: () => void;
 }
 
 function handleMenuAction(
@@ -14,13 +16,21 @@ function handleMenuAction(
 ): void {
   switch (action) {
     case "walkTo":
-      void showWalkPicker();
+      handlers.onUnfreeze();
+      void showTargetPicker("walk");
+      break;
+    case "climbTo":
+      handlers.onUnfreeze();
+      void showTargetPicker("climb");
       break;
     case "turnAround":
       handlers.onTurnAround();
       break;
     case "sit":
       handlers.onSit();
+      break;
+    case "toggleFreeze":
+      handlers.onToggleFreeze();
       break;
     default:
       break;
@@ -42,5 +52,5 @@ export function useCompanionMenuEvents(
     return () => {
       unlisten?.();
     };
-  }, [handlers.onSit, handlers.onTurnAround]);
+  }, [handlers.onSit, handlers.onToggleFreeze, handlers.onTurnAround, handlers.onUnfreeze]);
 }

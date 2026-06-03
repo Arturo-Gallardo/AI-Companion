@@ -12,5 +12,6 @@ export function useCompanionMirrorBroadcast(state: CompanionMirrorState): void {
     state.isDragging,
     state.behaviorState,
     state.dialogueText,
+    state.isFrozen,
   ]);
 }

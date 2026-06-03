@@ -7,11 +7,20 @@ use super::query_desktop_bounds;
 pub const WALK_PICKER_WINDOW_LABEL: &str = "walk-picker";
 pub const WALK_PICKER_SELECTED_EVENT: &str = "walk-picker-selected";
 pub const WALK_PICKER_CANCEL_EVENT: &str = "walk-picker-cancel";
+pub const TARGET_PICKER_OPEN_EVENT: &str = "target-picker-open";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct WalkPickerSelectedPayload {
+pub struct TargetPickerOpenPayload {
+    pub mode: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TargetPickerSelectedPayload {
+    pub mode: String,
     pub anchor_x: f64,
+    pub anchor_y: f64,
 }
 
 pub fn create_walk_picker_window(app: &AppHandle) -> Result<(), String> {
@@ -49,10 +58,11 @@ pub fn create_walk_picker_window(app: &AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn show_walk_picker(app: AppHandle) -> Result<(), String> {
+pub fn show_walk_picker(app: AppHandle, mode: Option<String>) -> Result<(), String> {
     let _ = hide_companion_menu(app.clone());
 
     let bounds = query_desktop_bounds()?;
+    let picker_mode = mode.unwrap_or_else(|| "walk".to_string());
 
     let window = app
         .get_webview_window(WALK_PICKER_WINDOW_LABEL)
@@ -68,6 +78,15 @@ pub fn show_walk_picker(app: AppHandle) -> Result<(), String> {
     window
         .set_position(PhysicalPosition::new(bounds.virtual_left, bounds.virtual_top))
         .map_err(|error| format!("failed to position walk picker window: {error}"))?;
+
+    window
+        .emit(
+            TARGET_PICKER_OPEN_EVENT,
+            TargetPickerOpenPayload {
+                mode: picker_mode,
+            },
+        )
+        .map_err(|error| format!("failed to emit target picker config: {error}"))?;
 
     window
         .show()
@@ -91,11 +110,20 @@ pub fn hide_walk_picker(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-pub fn emit_walk_picker_selected(app: &AppHandle, anchor_x: f64) -> Result<(), String> {
+pub fn emit_target_picker_selected(
+    app: &AppHandle,
+    mode: String,
+    anchor_x: f64,
+    anchor_y: f64,
+) -> Result<(), String> {
     let _ = app.emit_to(
         "companion",
         WALK_PICKER_SELECTED_EVENT,
-        WalkPickerSelectedPayload { anchor_x },
+        TargetPickerSelectedPayload {
+            mode,
+            anchor_x,
+            anchor_y,
+        },
     );
 
     Ok(())
@@ -109,8 +137,13 @@ pub fn emit_walk_picker_cancel(app: &AppHandle) -> Result<(), String> {
 
 // called from the walk-picker webview via invoke
 #[tauri::command]
-pub fn submit_walk_picker_target(app: AppHandle, anchor_x: f64) -> Result<(), String> {
-    emit_walk_picker_selected(&app, anchor_x)?;
+pub fn submit_target_picker(
+    app: AppHandle,
+    mode: String,
+    anchor_x: f64,
+    anchor_y: f64,
+) -> Result<(), String> {
+    emit_target_picker_selected(&app, mode, anchor_x, anchor_y)?;
     hide_walk_picker(app)
 }
 

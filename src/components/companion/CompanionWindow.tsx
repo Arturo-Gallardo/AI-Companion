@@ -3,6 +3,7 @@ import { useCompanionAnimation } from "../../hooks/useCompanionAnimation";
 import { useCompanionBackgroundEvents } from "../../hooks/useCompanionBackgroundEvents";
 import { useCompanionBehavior } from "../../hooks/useCompanionBehavior";
 import { useCompanionDialogueEvents } from "../../hooks/useCompanionDialogueEvents";
+import { useCompanionFreezeEvents } from "../../hooks/useCompanionFreezeEvents";
 import { useCompanionMenuEvents } from "../../hooks/useCompanionMenuEvents";
 import { useCompanionSitEvents } from "../../hooks/useCompanionSitEvents";
 import { useCompanionWalkPickerEvents } from "../../hooks/useCompanionWalkPickerEvents";
@@ -15,6 +16,7 @@ export function CompanionWindow() {
   const {
     displayAction,
     facing,
+    wallSide,
     behaviorState,
     dialogueText,
     isReady,
@@ -22,6 +24,7 @@ export function CompanionWindow() {
     grabbedLeanFrame,
     getAnchorPosition,
     onWalkTick,
+    onClimbTick,
     onBounceComplete,
     onPointerDown,
     startDialogue,
@@ -29,6 +32,10 @@ export function CompanionWindow() {
     toggleSit,
     turnAround,
     walkToAnchorX,
+    climbToAnchorY,
+    isFrozen,
+    toggleFreeze,
+    unfreeze,
     onContextMenu,
   } = useCompanionBehavior();
 
@@ -36,9 +43,16 @@ export function CompanionWindow() {
 
   useCompanionDialogueEvents({ startDialogue, dismissDialogue });
   useCompanionSitEvents({ toggleSit });
-  useCompanionMenuEvents({ onTurnAround: turnAround, onSit: toggleSit });
+  useCompanionFreezeEvents({ toggleFreeze });
+  useCompanionMenuEvents({
+    onTurnAround: turnAround,
+    onSit: toggleSit,
+    onToggleFreeze: toggleFreeze,
+    onUnfreeze: unfreeze,
+  });
   useCompanionWalkPickerEvents({
-    onSelectTarget: walkToAnchorX,
+    onSelectWalkTarget: walkToAnchorX,
+    onSelectClimbTarget: climbToAnchorY,
     onCancel: () => {},
   });
 
@@ -47,6 +61,7 @@ export function CompanionWindow() {
     facing,
     grabbedLeanFrame,
     onTick: onWalkTick,
+    onClimbTick,
     onBounceComplete,
   });
 
@@ -63,6 +78,7 @@ export function CompanionWindow() {
     isDragging: behaviorState === "dragging",
     behaviorState,
     dialogueText,
+    isFrozen,
   });
 
   if (!isReady) {
@@ -83,6 +99,7 @@ export function CompanionWindow() {
         frameSrc={frameSrc}
         facing={facing}
         action={displayAction}
+        wallSide={wallSide}
         isDragging={behaviorState === "dragging"}
         onPointerDown={onPointerDown}
         onContextMenu={onContextMenu}

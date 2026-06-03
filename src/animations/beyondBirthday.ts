@@ -1,4 +1,9 @@
-import type { AnimationDefinition, CompanionAction, SpriteAnchor } from "./types";
+import type {
+  AnimationDefinition,
+  CompanionAction,
+  SpriteAnchor,
+} from "./types";
+import type { SurfaceLock } from "../types/companion";
 
 export const COMPANION_ASSET_BASE = "/companion/beyond-birthday";
 
@@ -73,6 +78,27 @@ export const TITLE_BAR_DANGLE_ANIMATION: AnimationDefinition = {
   velocity: { x: 0, y: 0 },
 };
 
+// clinging to a window wall — shimeji GrabWall / ClimbWall
+export const GRAB_WALL_ANIMATION: AnimationDefinition = {
+  frames: ["shime13.png"],
+  tickDuration: 250,
+  velocity: { x: 0, y: 0 },
+};
+
+export const CLIMB_WALL_UP_ANIMATION: AnimationDefinition = {
+  frames: ["shime14.png", "shime12.png", "shime13.png", "shime13.png"],
+  tickDuration: 4,
+  frameTickDurations: [16, 4, 4, 4],
+  velocity: { x: 0, y: -2 },
+};
+
+export const CLIMB_WALL_DOWN_ANIMATION: AnimationDefinition = {
+  frames: ["shime14.png", "shime12.png", "shime13.png", "shime13.png"],
+  tickDuration: 4,
+  frameTickDurations: [16, 4, 4, 4],
+  velocity: { x: 0, y: 2 },
+};
+
 export function getFrameTickDuration(
   animation: AnimationDefinition,
   frameIndex: number,
@@ -113,6 +139,9 @@ const ANIMATION_BY_ACTION: Record<CompanionAction, AnimationDefinition> = {
   sit: SIT_ANIMATION,
   sitOnBar: TITLE_BAR_SIT_ANIMATION,
   dangleOnBar: TITLE_BAR_DANGLE_ANIMATION,
+  grabWall: GRAB_WALL_ANIMATION,
+  climbWall: CLIMB_WALL_UP_ANIMATION,
+  climbWallDown: CLIMB_WALL_DOWN_ANIMATION,
   grabbed: GRABBED_ANIMATION,
   resist: RESIST_ANIMATION,
   fall: FALL_ANIMATION,
@@ -123,17 +152,25 @@ export function usesTitleBarSitAnchor(action: CompanionAction): boolean {
   return action === "sitOnBar" || action === "dangleOnBar";
 }
 
-// when locked to a title bar, only swap floor sit for the perched leg-dangle loop
+// when locked to a surface, swap floor actions for perched / wall poses
 export function resolveDisplayAction(
   action: CompanionAction,
-  isSurfaceLocked: boolean,
+  surfaceLock: SurfaceLock | null,
 ): CompanionAction {
-  if (!isSurfaceLocked) {
+  if (!surfaceLock) {
     return action;
   }
 
-  if (action === "sit") {
+  if (surfaceLock.kind === "titleBar" && action === "sit") {
     return "dangleOnBar";
+  }
+
+  if (surfaceLock.kind === "wallLeft" || surfaceLock.kind === "wallRight") {
+    if (action === "climbWall" || action === "climbWallDown") {
+      return action;
+    }
+
+    return "grabWall";
   }
 
   return action;
