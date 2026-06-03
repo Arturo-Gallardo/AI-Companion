@@ -1,5 +1,6 @@
 import { SPRITE_WIDTH } from "../../animations/beyondBirthday";
 import { useCompanionAnimation } from "../../hooks/useCompanionAnimation";
+import { useCompanionBackgroundEvents } from "../../hooks/useCompanionBackgroundEvents";
 import { useCompanionBehavior } from "../../hooks/useCompanionBehavior";
 import { useCompanionDialogueEvents } from "../../hooks/useCompanionDialogueEvents";
 import { useCompanionMirrorBroadcast } from "../../hooks/useCompanionMirrorBroadcast";
@@ -21,6 +22,8 @@ export function CompanionWindow() {
     startDialogue,
     dismissDialogue,
   } = useCompanionBehavior();
+
+  const backgroundMode = useCompanionBackgroundEvents();
 
   useCompanionDialogueEvents({ startDialogue, dismissDialogue });
 
@@ -47,7 +50,9 @@ export function CompanionWindow() {
 
   return (
     <div
-      className="flex flex-col items-center justify-end bg-transparent"
+      className={`flex flex-col items-center justify-end ${
+        backgroundMode === "gray" ? "bg-neutral-600/45" : "bg-transparent"
+      }`}
       style={{ width: SPRITE_WIDTH, height: COMPANION_WINDOW_HEIGHT }}
     >
       {dialogueText !== null ? (
