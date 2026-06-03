@@ -3,9 +3,9 @@ import type { RefObject } from "react";
 import type { CompanionBehaviorState } from "../types/companion";
 import { pickRandomMotivationalQuote } from "../utils/pickRandomQuote";
 
-const MIN_AUTONOMOUS_DIALOGUE_MS = 40000;
-const MAX_AUTONOMOUS_DIALOGUE_MS = 100000;
-const AUTONOMOUS_DIALOGUE_CHANCE = 0.32;
+const MIN_AUTONOMOUS_DIALOGUE_MS = 20000;
+const MAX_AUTONOMOUS_DIALOGUE_MS = 50000;
+const AUTONOMOUS_DIALOGUE_CHANCE = 0.2;
 
 const ELIGIBLE_STATES: ReadonlySet<CompanionBehaviorState> = new Set([
   "idle",
@@ -17,9 +17,7 @@ function randomBetween(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
-function isAutonomousDialogueEligible(
-  state: CompanionBehaviorState,
-): boolean {
+function isAutonomousDialogueEligible(state: CompanionBehaviorState): boolean {
   return ELIGIBLE_STATES.has(state);
 }
 
@@ -47,11 +45,7 @@ export function useAutonomousDialogue({
   }, [startDialogue]);
 
   useEffect(() => {
-    if (
-      !isReady ||
-      isFrozen ||
-      !isAutonomousDialogueEligible(behaviorState)
-    ) {
+    if (!isReady || isFrozen || !isAutonomousDialogueEligible(behaviorState)) {
       return;
     }
 
@@ -59,25 +53,28 @@ export function useAutonomousDialogue({
     let timeoutId = 0;
 
     const scheduleNext = () => {
-      timeoutId = window.setTimeout(() => {
-        if (cancelled || isFrozenRef.current) {
-          return;
-        }
+      timeoutId = window.setTimeout(
+        () => {
+          if (cancelled || isFrozenRef.current) {
+            return;
+          }
 
-        const currentState = behaviorStateRef.current;
-        if (
-          currentState === undefined ||
-          !isAutonomousDialogueEligible(currentState)
-        ) {
-          return;
-        }
+          const currentState = behaviorStateRef.current;
+          if (
+            currentState === undefined ||
+            !isAutonomousDialogueEligible(currentState)
+          ) {
+            return;
+          }
 
-        if (Math.random() < AUTONOMOUS_DIALOGUE_CHANCE) {
-          startDialogueRef.current(pickRandomMotivationalQuote());
-        }
+          if (Math.random() < AUTONOMOUS_DIALOGUE_CHANCE) {
+            startDialogueRef.current(pickRandomMotivationalQuote());
+          }
 
-        scheduleNext();
-      }, randomBetween(MIN_AUTONOMOUS_DIALOGUE_MS, MAX_AUTONOMOUS_DIALOGUE_MS));
+          scheduleNext();
+        },
+        randomBetween(MIN_AUTONOMOUS_DIALOGUE_MS, MAX_AUTONOMOUS_DIALOGUE_MS),
+      );
     };
 
     scheduleNext();
