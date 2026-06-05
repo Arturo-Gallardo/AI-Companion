@@ -59,7 +59,6 @@ export function DashboardHeader({ activeTab, onTabChange }: DashboardHeaderProps
             label="Tomojis"
             tab="tomojis"
             activeTab={activeTab}
-            disabled
             onTabChange={onTabChange}
           />
           <NavItem

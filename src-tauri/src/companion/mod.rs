@@ -227,6 +227,30 @@ pub fn set_companion_position(
     Ok(())
 }
 
+#[tauri::command]
+pub fn set_companion_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let window = app
+        .get_webview_window("companion")
+        .ok_or_else(|| "companion window not found".to_string())?;
+
+    if enabled {
+        window
+            .show()
+            .map_err(|error| format!("failed to show companion window: {error}"))?;
+        return Ok(());
+    }
+
+    let _ = hide_companion_speech(app.clone());
+    let _ = hide_companion_menu(app.clone());
+    let _ = hide_walk_picker(app);
+
+    window
+        .hide()
+        .map_err(|error| format!("failed to hide companion window: {error}"))?;
+
+    Ok(())
+}
+
 pub fn create_companion_window(app: &AppHandle) -> Result<(), String> {
     if app.get_webview_window("companion").is_some() {
         return Ok(());

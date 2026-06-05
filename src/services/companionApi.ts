@@ -27,6 +27,10 @@ export async function setCompanionPosition(
   });
 }
 
+export async function setCompanionEnabled(enabled: boolean): Promise<void> {
+  await invoke("set_companion_enabled", { enabled });
+}
+
 export async function getWindowSurfaces(): Promise<WindowSurface[]> {
   return invoke<WindowSurface[]>("get_window_surfaces");
 }

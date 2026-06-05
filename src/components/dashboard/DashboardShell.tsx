@@ -5,6 +5,7 @@ import { DashboardBackgroundToggle } from "./DashboardBackgroundToggle";
 import { DashboardHeader } from "./DashboardHeader";
 import { DashboardOptionsPanel } from "./DashboardOptionsPanel";
 import { SettingsView } from "./SettingsView";
+import { TomojisView } from "./TomojisView";
 
 export function DashboardShell() {
   const { activeTab, setTab } = useDashboardTab();
@@ -14,7 +15,9 @@ export function DashboardShell() {
     <main className="relative flex h-screen flex-col bg-neutral-950 text-neutral-100">
       <DashboardHeader activeTab={activeTab} onTabChange={setTab} />
 
-      {activeTab === "dashboard" ? (
+      {activeTab === "tomojis" ? (
+        <TomojisView />
+      ) : activeTab === "dashboard" ? (
         <div className="grid min-h-0 flex-1 grid-cols-2">
           <CompanionPreview />
           <DashboardOptionsPanel />

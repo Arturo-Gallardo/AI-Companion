@@ -10,10 +10,6 @@ export function useDashboardTab(): UseDashboardTabResult {
   const [activeTab, setActiveTab] = useState<DashboardTab>("dashboard");
 
   const setTab = useCallback((tab: DashboardTab) => {
-    if (tab === "tomojis") {
-      return;
-    }
-
     setActiveTab(tab);
   }, []);
 
