@@ -17,11 +17,8 @@ function App() {
     return null;
   }
 
-  if (windowLabel === "companion") {
-    return <CompanionWindow />;
-  }
-
-  if (windowLabel === "companion-speech") {
+  // speech windows share the companion- prefix, so match them first
+  if (windowLabel.startsWith("companion-speech-")) {
     return <CompanionSpeechWindow />;
   }
 
@@ -31,6 +28,11 @@ function App() {
 
   if (windowLabel === "walk-picker") {
     return <WalkPickerWindow />;
+  }
+
+  // any remaining companion-<id> window is a live companion instance
+  if (windowLabel.startsWith("companion-")) {
+    return <CompanionWindow />;
   }
 
   return <DashboardShell />;

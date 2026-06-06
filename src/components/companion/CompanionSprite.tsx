@@ -3,7 +3,11 @@ import {
   SPRITE_HEIGHT,
   SPRITE_WIDTH,
 } from "../../animations/beyondBirthday";
-import type { CompanionAction, FacingDirection } from "../../animations/types";
+import type {
+  CompanionAction,
+  FacingDirection,
+  SpriteAnchor,
+} from "../../animations/types";
 import type { WindowWallSide } from "../../types/companion";
 
 interface CompanionSpriteProps {
@@ -14,6 +18,10 @@ interface CompanionSpriteProps {
   isDragging?: boolean;
   interactive?: boolean;
   scale?: number;
+  // unscaled sprite frame size + anchor; defaults to the built-in character
+  spriteWidth?: number;
+  spriteHeight?: number;
+  spriteAnchor?: SpriteAnchor;
   onPointerDown?: (event: React.PointerEvent<HTMLElement>) => void;
   onContextMenu?: (event: React.MouseEvent<HTMLElement>) => void;
 }
@@ -35,6 +43,8 @@ function shouldFlipSprite(
     action !== "idle" &&
     action !== "walk" &&
     action !== "sit" &&
+    action !== "sitAlt" &&
+    action !== "sitAlt2" &&
     action !== "sitOnBar" &&
     action !== "dangleOnBar" &&
     action !== "grabCeiling" &&
@@ -54,13 +64,16 @@ export function CompanionSprite({
   isDragging = false,
   interactive = true,
   scale = 1,
+  spriteWidth = SPRITE_WIDTH,
+  spriteHeight = SPRITE_HEIGHT,
+  spriteAnchor: spriteAnchorProp,
   onPointerDown,
   onContextMenu,
 }: CompanionSpriteProps) {
   const flipScale = shouldFlipSprite(action, facing, wallSide) ? -1 : 1;
-  const spriteAnchor = getSpriteAnchorForAction(action);
-  const width = SPRITE_WIDTH * scale;
-  const height = SPRITE_HEIGHT * scale;
+  const spriteAnchor = spriteAnchorProp ?? getSpriteAnchorForAction(action);
+  const width = spriteWidth * scale;
+  const height = spriteHeight * scale;
 
   return (
     <div

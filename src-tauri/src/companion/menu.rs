@@ -13,6 +13,8 @@ pub struct CompanionMenuConfigPayload {
     pub wall_locked: bool,
     pub underside_locked: bool,
     pub frozen: bool,
+    // the companion window the menu should route its actions back to
+    pub target_label: String,
 }
 
 const MENU_WIDTH: f64 = 152.0;
@@ -90,13 +92,16 @@ pub fn create_companion_menu_window(app: &AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub fn show_companion_menu(
-    app: AppHandle,
+    caller: tauri::WebviewWindow,
     screen_x: f64,
     screen_y: f64,
     wall_locked: bool,
     underside_locked: bool,
     frozen: bool,
 ) -> Result<(), String> {
+    let app = caller.app_handle();
+    let target_label = caller.label().to_string();
+
     let window = app
         .get_webview_window(MENU_WINDOW_LABEL)
         .ok_or_else(|| "companion menu window not found".to_string())?;
@@ -110,6 +115,7 @@ pub fn show_companion_menu(
                 wall_locked,
                 underside_locked,
                 frozen,
+                target_label,
             },
         )
         .map_err(|error| format!("failed to emit companion menu config: {error}"))?;

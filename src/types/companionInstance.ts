@@ -1,0 +1,25 @@
+import type { CompanionAction } from "../animations/types";
+import type { BehaviorSettings, DialogueSettings } from "./character";
+import type { CompanionBehaviorState, ScreenPosition } from "./companion";
+
+export interface CompanionVelocity {
+  x: number;
+  y: number;
+}
+
+// a live companion on screen. one CompanionInstance maps to one OS window
+// labelled companion-<id>. behavior/dialogue settings start from the
+// character defaults and can be overridden per instance.
+export interface CompanionInstance {
+  id: string;
+  name: string;
+  characterId: string;
+  position: ScreenPosition;
+  velocity: CompanionVelocity;
+  scale: number;
+  enabled: boolean;
+  currentAnimation: CompanionAction;
+  behaviorState: CompanionBehaviorState;
+  behaviorSettings: BehaviorSettings;
+  dialogueSettings: DialogueSettings;
+}

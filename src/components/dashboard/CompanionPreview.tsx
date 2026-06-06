@@ -1,17 +1,22 @@
+import { useMemo } from "react";
 import { SPRITE_HEIGHT, SPRITE_WIDTH } from "../../animations/beyondBirthday";
 import { useCompanionAnimation } from "../../hooks/useCompanionAnimation";
 import { useCompanionMirrorState } from "../../hooks/useCompanionMirrorState";
+import { createBuiltinRegistry } from "../../services/animationRegistry";
 import { CompanionSprite } from "../companion/CompanionSprite";
 
 const PREVIEW_SCALE = 3;
 
 export function CompanionPreview() {
   const mirrorState = useCompanionMirrorState();
+  // the preview mirrors the built-in default companion
+  const registry = useMemo(() => createBuiltinRegistry(), []);
 
   const { frameSrc } = useCompanionAnimation({
+    registry,
     action: mirrorState.action,
     facing: mirrorState.facing,
-    grabbedLeanFrame: mirrorState.grabbedLeanFrame,
+    grabbedLeanTier: mirrorState.grabbedLeanTier,
   });
 
   const previewWidth = SPRITE_WIDTH * PREVIEW_SCALE;

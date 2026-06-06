@@ -20,6 +20,8 @@ export type CompanionAction =
   | "idle"
   | "walk"
   | "sit"
+  | "sitAlt"
+  | "sitAlt2"
   | "sitOnBar"
   | "dangleOnBar"
   | "grabWall"
@@ -33,3 +35,11 @@ export type CompanionAction =
   | "bounce";
 
 export type FacingDirection = "left" | "right";
+
+// velocity-based lean tier while the pet is being dragged
+export type GrabbedLeanTier =
+  | "neutral"
+  | "mildLeft"
+  | "strongLeft"
+  | "mildRight"
+  | "strongRight";

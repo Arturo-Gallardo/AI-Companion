@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  DEFAULT_GRABBED_LEAN_FRAME,
-  getGrabbedFrameFromLeanTier,
   resolveGrabbedLeanTier,
   TICK_INTERVAL_MS,
-  type GrabbedLeanTier,
 } from "../animations/beyondBirthday";
+import type { GrabbedLeanTier } from "../animations/types";
 import type {
   AnchorClampMode,
   DragOffset,
@@ -60,7 +58,7 @@ interface UseCompanionDragOptions {
 
 interface UseCompanionDragResult {
   isDragging: boolean;
-  grabbedLeanFrame: string;
+  grabbedLeanTier: GrabbedLeanTier;
   onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
 }
 
@@ -75,7 +73,8 @@ export function useCompanionDrag({
   onDragEnd,
 }: UseCompanionDragOptions): UseCompanionDragResult {
   const [isDragging, setIsDragging] = useState(false);
-  const [grabbedLeanFrame, setGrabbedLeanFrame] = useState(DEFAULT_GRABBED_LEAN_FRAME);
+  const [grabbedLeanTier, setGrabbedLeanTier] =
+    useState<GrabbedLeanTier>("neutral");
 
   const isDraggingRef = useRef(false);
   const leanTierRef = useRef<GrabbedLeanTier>("neutral");
@@ -113,7 +112,7 @@ export function useCompanionDrag({
   const resetLeanState = useCallback(() => {
     leanTierRef.current = "neutral";
     smoothedVelocityRef.current = 0;
-    setGrabbedLeanFrame(DEFAULT_GRABBED_LEAN_FRAME);
+    setGrabbedLeanTier("neutral");
   }, []);
 
   const updateLeanFromVelocity = useCallback((rawVelocityX: number) => {
@@ -123,7 +122,7 @@ export function useCompanionDrag({
     smoothedVelocityRef.current = smoothed;
 
     leanTierRef.current = resolveGrabbedLeanTier(leanTierRef.current, smoothed);
-    setGrabbedLeanFrame(getGrabbedFrameFromLeanTier(leanTierRef.current));
+    setGrabbedLeanTier(leanTierRef.current);
   }, []);
 
   const finishDrag = useCallback(
@@ -265,7 +264,7 @@ export function useCompanionDrag({
 
   return {
     isDragging,
-    grabbedLeanFrame,
+    grabbedLeanTier,
     onPointerDown,
   };
 }

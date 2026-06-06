@@ -4,10 +4,13 @@ import {
   COMPANION_SPEECH_ANIMATE_OUT_EVENT,
   COMPANION_SPEECH_ANIMATION_MS,
 } from "../constants/companionSpeechAnimation";
+import {
+  getCurrentInstanceId,
+  speechWindowLabel,
+} from "./companionInstanceContext";
 import type { ScreenPosition } from "../types/companion";
 import type { SpeechBubblePlacement } from "../types/companionSpeech";
 
-export const COMPANION_SPEECH_WINDOW_LABEL = "companion-speech";
 export const COMPANION_SPEECH_CONTENT_EVENT = "companion-speech-content";
 export const COMPANION_SPEECH_DISMISS_EVENT = "companion-speech-dismiss";
 export const COMPANION_SPEECH_PLACEMENT_EVENT = "companion-speech-placement";
@@ -50,8 +53,13 @@ function delay(ms: number): Promise<void> {
 
 // plays the exit animation in the speech webview before the native window hides
 export async function animateOutCompanionSpeech(): Promise<void> {
+  const instanceId = getCurrentInstanceId();
+  if (instanceId === null) {
+    return;
+  }
+
   await emitTo(
-    COMPANION_SPEECH_WINDOW_LABEL,
+    speechWindowLabel(instanceId),
     COMPANION_SPEECH_ANIMATE_OUT_EVENT,
   );
   await delay(COMPANION_SPEECH_ANIMATION_MS);

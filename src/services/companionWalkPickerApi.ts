@@ -19,15 +19,16 @@ export async function hideWalkPicker(): Promise<void> {
 }
 
 export async function submitTargetPicker(
+  targetLabel: string,
   mode: TargetPickerMode,
   anchorX: number,
   anchorY: number,
 ): Promise<void> {
-  await invoke("submit_target_picker", { mode, anchorX, anchorY });
+  await invoke("submit_target_picker", { targetLabel, mode, anchorX, anchorY });
 }
 
-export async function cancelWalkPicker(): Promise<void> {
-  await invoke("cancel_walk_picker");
+export async function cancelWalkPicker(targetLabel: string): Promise<void> {
+  await invoke("cancel_walk_picker", { targetLabel });
 }
 
 export async function listenTargetPickerOpen(

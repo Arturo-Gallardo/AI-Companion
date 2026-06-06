@@ -1,18 +1,25 @@
-import { SPRITE_HEIGHT, SPRITE_WIDTH } from "../../animations/beyondBirthday";
 import { useCompanionAnimation } from "../../hooks/useCompanionAnimation";
 import { useCompanionBackgroundEvents } from "../../hooks/useCompanionBackgroundEvents";
 import { useCompanionBehavior } from "../../hooks/useCompanionBehavior";
 import { useCompanionDialogueEvents } from "../../hooks/useCompanionDialogueEvents";
 import { useCompanionFreezeEvents } from "../../hooks/useCompanionFreezeEvents";
+import { useCompanionInstanceConfig } from "../../hooks/useCompanionInstanceConfig";
 import { useCompanionMenuEvents } from "../../hooks/useCompanionMenuEvents";
 import { useCompanionSitEvents } from "../../hooks/useCompanionSitEvents";
 import { useCompanionWalkPickerEvents } from "../../hooks/useCompanionWalkPickerEvents";
 import { useCompanionMirrorBroadcast } from "../../hooks/useCompanionMirrorBroadcast";
 import { useCompanionSpeechWindow } from "../../hooks/useCompanionSpeechWindow";
+import type { AnimationRegistry } from "../../services/animationRegistry";
+import type { CompanionInstance } from "../../types/companionInstance";
 import { CompanionSprite } from "./CompanionSprite";
 import { CompanionSurfaceLockIndicator } from "./CompanionSurfaceLockIndicator";
 
-export function CompanionWindow() {
+interface CompanionWindowInnerProps {
+  instance: CompanionInstance;
+  registry: AnimationRegistry;
+}
+
+function CompanionWindowInner({ instance, registry }: CompanionWindowInnerProps) {
   const {
     displayAction,
     facing,
@@ -21,7 +28,7 @@ export function CompanionWindow() {
     dialogueText,
     isReady,
     showTitleBarLockHint,
-    grabbedLeanFrame,
+    grabbedLeanTier,
     getAnchorPosition,
     onWalkTick,
     onClimbTick,
@@ -38,7 +45,11 @@ export function CompanionWindow() {
     toggleFreeze,
     unfreeze,
     onContextMenu,
-  } = useCompanionBehavior();
+  } = useCompanionBehavior({
+    registry,
+    initialAnchor: instance.position,
+    dialogueSettings: instance.dialogueSettings,
+  });
 
   const backgroundMode = useCompanionBackgroundEvents();
 
@@ -59,9 +70,10 @@ export function CompanionWindow() {
   });
 
   const { frameSrc } = useCompanionAnimation({
+    registry,
     action: displayAction,
     facing,
-    grabbedLeanFrame,
+    grabbedLeanTier,
     onTick: onWalkTick,
     onClimbTick,
     onBounceComplete,
@@ -74,9 +86,10 @@ export function CompanionWindow() {
   });
 
   useCompanionMirrorBroadcast({
+    instanceId: instance.id,
     action: displayAction,
     facing,
-    grabbedLeanFrame,
+    grabbedLeanTier,
     isDragging: behaviorState === "dragging",
     behaviorState,
     dialogueText,
@@ -87,12 +100,15 @@ export function CompanionWindow() {
     return null;
   }
 
+  const width = registry.spriteWidth * instance.scale;
+  const height = registry.spriteHeight * instance.scale;
+
   return (
     <div
       className={`relative overflow-visible ${
         backgroundMode === "gray" ? "bg-neutral-600/45" : "bg-transparent"
       }`}
-      style={{ width: SPRITE_WIDTH, height: SPRITE_HEIGHT }}
+      style={{ width, height }}
     >
       <CompanionSurfaceLockIndicator
         visible={showTitleBarLockHint && behaviorState === "dragging"}
@@ -103,9 +119,28 @@ export function CompanionWindow() {
         action={displayAction}
         wallSide={wallSide}
         isDragging={behaviorState === "dragging"}
+        scale={instance.scale}
+        spriteWidth={registry.spriteWidth}
+        spriteHeight={registry.spriteHeight}
+        spriteAnchor={registry.getSpriteAnchor(displayAction)}
         onPointerDown={onPointerDown}
         onContextMenu={onContextMenu}
       />
     </div>
+  );
+}
+
+export function CompanionWindow() {
+  const config = useCompanionInstanceConfig();
+
+  if (!config) {
+    return null;
+  }
+
+  return (
+    <CompanionWindowInner
+      instance={config.instance}
+      registry={config.registry}
+    />
   );
 }

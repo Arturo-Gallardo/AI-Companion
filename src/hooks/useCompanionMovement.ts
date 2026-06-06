@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { UNDERSIDE_GRAB_ANCHOR, SPRITE_ANCHOR } from "../animations/beyondBirthday";
+import type { AnimationRegistry } from "../services/animationRegistry";
 import {
   getDesktopBounds,
   hitTitleBarAt,
@@ -49,6 +49,8 @@ import {
 import { useCompanionWindowSurfaces } from "./useCompanionWindowSurfaces";
 
 interface UseCompanionMovementOptions {
+  registry: AnimationRegistry;
+  initialAnchor?: ScreenPosition;
   onSurfaceLockLost?: () => void;
   usesTitleBarSitAnchorRef?: RefObject<boolean>;
 }
@@ -81,9 +83,10 @@ interface UseCompanionMovementResult {
 }
 
 export function useCompanionMovement(
-  options: UseCompanionMovementOptions = {},
+  options: UseCompanionMovementOptions,
 ): UseCompanionMovementResult {
-  const { onSurfaceLockLost, usesTitleBarSitAnchorRef } = options;
+  const { registry, initialAnchor, onSurfaceLockLost, usesTitleBarSitAnchorRef } =
+    options;
   const onSurfaceLockLostRef = useRef(onSurfaceLockLost);
 
   useEffect(() => {
@@ -109,11 +112,13 @@ export function useCompanionMovement(
   const getAnchorYOffset = useCallback((): number => {
     const lock = surfaceLockRef.current;
     if (lock && isUndersideLock(lock.kind)) {
-      return UNDERSIDE_GRAB_ANCHOR.y;
+      return registry.getSpriteAnchor("grabCeiling").y;
     }
 
-    return SPRITE_ANCHOR.y;
-  }, []);
+    return registry.getSpriteAnchor("idle").y;
+  }, [registry]);
+
+  const anchorXOffset = registry.spriteWidth / 2;
 
   useEffect(() => {
     desktopBoundsRef.current = desktopBounds;
@@ -281,9 +286,10 @@ export function useCompanionMovement(
       setAnchorXState(nextPosition.x);
       setAnchorYState(nextPosition.y);
 
-      await setCompanionPosition(nextPosition, getAnchorYOffset());
+      await setCompanionPosition(nextPosition, getAnchorYOffset(), anchorXOffset);
     },
     [
+      anchorXOffset,
       clampGroundedPosition,
       clampLockedPosition,
       clampToWallsPosition,
@@ -408,7 +414,8 @@ export function useCompanionMovement(
       setDesktopBounds(bounds);
       desktopBoundsRef.current = bounds;
 
-      const startPosition = getRightmostMonitorFloorStart(bounds);
+      // prefer the instance's saved anchor; fall back to the default corner
+      const startPosition = initialAnchor ?? getRightmostMonitorFloorStart(bounds);
 
       anchorRef.current = startPosition;
       setAnchorXState(startPosition.x);
@@ -423,7 +430,7 @@ export function useCompanionMovement(
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialAnchor]);
 
   const getAnchorPosition = useCallback((): ScreenPosition => {
     return anchorRef.current;

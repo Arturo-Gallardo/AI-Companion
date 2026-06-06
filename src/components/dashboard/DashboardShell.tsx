@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { useDashboardTab } from "../../hooks/useDashboardTab";
 import { useCompanionBackgroundToggle } from "../../hooks/useCompanionBackgroundToggle";
+import { bootstrapCompanions } from "../../services/companionInstanceManager";
 import { CompanionPreview } from "./CompanionPreview";
 import { DashboardBackgroundToggle } from "./DashboardBackgroundToggle";
 import { DashboardHeader } from "./DashboardHeader";
@@ -10,6 +12,11 @@ import { TomojisView } from "./TomojisView";
 export function DashboardShell() {
   const { activeTab, setTab } = useDashboardTab();
   const { mode, toggleLabel, cycleMode } = useCompanionBackgroundToggle();
+
+  // spawn windows for enabled companions once when the dashboard opens
+  useEffect(() => {
+    void bootstrapCompanions();
+  }, []);
 
   return (
     <main className="relative flex h-screen flex-col bg-neutral-950 text-neutral-100">

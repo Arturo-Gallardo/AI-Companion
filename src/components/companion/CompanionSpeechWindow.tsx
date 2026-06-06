@@ -118,7 +118,7 @@ export function CompanionSpeechWindow() {
   return (
     <div
       ref={bubbleRef}
-      className={`${stageClassName} inline-flex justify-center`}
+      className={`${stageClassName} inline-flex justify-center overflow-hidden`}
       style={{ width: "max-content", maxWidth: 128 }}
     >
       <div className={animationClass}>

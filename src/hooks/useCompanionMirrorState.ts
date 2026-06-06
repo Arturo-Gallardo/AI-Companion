@@ -5,7 +5,10 @@ import {
   type CompanionMirrorState,
 } from "../types/companionMirror";
 
-export function useCompanionMirrorState(): CompanionMirrorState {
+// mirrors a single companion (the default one) onto the dashboard preview.
+export function useCompanionMirrorState(
+  instanceId = "default",
+): CompanionMirrorState {
   const [mirrorState, setMirrorState] = useState<CompanionMirrorState>(
     DEFAULT_COMPANION_MIRROR_STATE,
   );
@@ -14,7 +17,9 @@ export function useCompanionMirrorState(): CompanionMirrorState {
     let unlisten: (() => void) | undefined;
 
     void listenMirrorState((state) => {
-      setMirrorState(state);
+      if (state.instanceId === instanceId) {
+        setMirrorState(state);
+      }
     }).then((cleanup) => {
       unlisten = cleanup;
     });
@@ -22,7 +27,7 @@ export function useCompanionMirrorState(): CompanionMirrorState {
     return () => {
       unlisten?.();
     };
-  }, []);
+  }, [instanceId]);
 
   return mirrorState;
 }

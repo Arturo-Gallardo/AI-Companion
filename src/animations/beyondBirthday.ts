@@ -1,6 +1,7 @@
 import type {
   AnimationDefinition,
   CompanionAction,
+  GrabbedLeanTier,
   SpriteAnchor,
 } from "./types";
 import type { SurfaceLock } from "../types/companion";
@@ -142,12 +143,7 @@ export const GRAB_EXIT_MILD = 1;
 export const GRAB_ENTER_STRONG = 6.5;
 export const GRAB_EXIT_STRONG = 4.5;
 
-export type GrabbedLeanTier =
-  | "neutral"
-  | "mildLeft"
-  | "strongLeft"
-  | "mildRight"
-  | "strongRight";
+export type { GrabbedLeanTier } from "./types";
 
 export const DEFAULT_GRABBED_LEAN_FRAME = "shime1.png";
 
@@ -162,6 +158,8 @@ const ANIMATION_BY_ACTION: Record<CompanionAction, AnimationDefinition> = {
   idle: IDLE_ANIMATION,
   walk: WALK_ANIMATION,
   sit: SIT_ANIMATION,
+  sitAlt: SIT_ANIMATION,
+  sitAlt2: SIT_ANIMATION,
   sitOnBar: TITLE_BAR_SIT_ANIMATION,
   dangleOnBar: TITLE_BAR_DANGLE_ANIMATION,
   grabWall: GRAB_WALL_ANIMATION,
@@ -192,7 +190,10 @@ export function resolveDisplayAction(
     return action;
   }
 
-  if (surfaceLock.kind === "titleBar" && action === "sit") {
+  if (
+    surfaceLock.kind === "titleBar" &&
+    (action === "sit" || action === "sitAlt" || action === "sitAlt2")
+  ) {
     return "dangleOnBar";
   }
 

@@ -90,7 +90,10 @@ export function useCompanionSpeechBubbleAnimation(
   const animationClass = getAnimationClass(phase, placement);
   const stageClassName = getStageClassName(placement);
 
-  const canMeasureSize = phase === "visible" || phase === "exiting";
+  // measure as soon as text is on screen so the native window resizes before
+  // the 32px initial size can flash scrollbars
+  const canMeasureSize =
+    phase === "entering" || phase === "visible" || phase === "exiting";
 
   return { animationClass, stageClassName, canMeasureSize };
 }

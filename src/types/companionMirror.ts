@@ -1,11 +1,15 @@
-import { DEFAULT_GRABBED_LEAN_FRAME } from "../animations/beyondBirthday";
-import type { CompanionAction, FacingDirection } from "../animations/types";
+import type {
+  CompanionAction,
+  FacingDirection,
+  GrabbedLeanTier,
+} from "../animations/types";
 import type { CompanionBehaviorState } from "./companion";
 
 export interface CompanionMirrorState {
+  instanceId: string;
   action: CompanionAction;
   facing: FacingDirection;
-  grabbedLeanFrame: string;
+  grabbedLeanTier: GrabbedLeanTier;
   isDragging: boolean;
   behaviorState: CompanionBehaviorState;
   dialogueText: string | null;
@@ -13,9 +17,10 @@ export interface CompanionMirrorState {
 }
 
 export const DEFAULT_COMPANION_MIRROR_STATE: CompanionMirrorState = {
+  instanceId: "default",
   action: "idle",
   facing: "left",
-  grabbedLeanFrame: DEFAULT_GRABBED_LEAN_FRAME,
+  grabbedLeanTier: "neutral",
   isDragging: false,
   behaviorState: "idle",
   dialogueText: null,

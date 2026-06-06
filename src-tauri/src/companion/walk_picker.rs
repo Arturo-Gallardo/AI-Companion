@@ -13,6 +13,8 @@ pub const TARGET_PICKER_OPEN_EVENT: &str = "target-picker-open";
 #[serde(rename_all = "camelCase")]
 pub struct TargetPickerOpenPayload {
     pub mode: String,
+    // companion window the picker result should be routed back to
+    pub target_label: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -58,7 +60,12 @@ pub fn create_walk_picker_window(app: &AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn show_walk_picker(app: AppHandle, mode: Option<String>) -> Result<(), String> {
+pub fn show_walk_picker(
+    caller: tauri::WebviewWindow,
+    mode: Option<String>,
+) -> Result<(), String> {
+    let app = caller.app_handle().clone();
+    let target_label = caller.label().to_string();
     let _ = hide_companion_menu(app.clone());
 
     let bounds = query_desktop_bounds()?;
@@ -84,6 +91,7 @@ pub fn show_walk_picker(app: AppHandle, mode: Option<String>) -> Result<(), Stri
             TARGET_PICKER_OPEN_EVENT,
             TargetPickerOpenPayload {
                 mode: picker_mode,
+                target_label,
             },
         )
         .map_err(|error| format!("failed to emit target picker config: {error}"))?;
@@ -112,12 +120,13 @@ pub fn hide_walk_picker(app: AppHandle) -> Result<(), String> {
 
 pub fn emit_target_picker_selected(
     app: &AppHandle,
+    target_label: &str,
     mode: String,
     anchor_x: f64,
     anchor_y: f64,
 ) -> Result<(), String> {
     let _ = app.emit_to(
-        "companion",
+        target_label,
         WALK_PICKER_SELECTED_EVENT,
         TargetPickerSelectedPayload {
             mode,
@@ -129,8 +138,8 @@ pub fn emit_target_picker_selected(
     Ok(())
 }
 
-pub fn emit_walk_picker_cancel(app: &AppHandle) -> Result<(), String> {
-    let _ = app.emit_to("companion", WALK_PICKER_CANCEL_EVENT, ());
+pub fn emit_walk_picker_cancel(app: &AppHandle, target_label: &str) -> Result<(), String> {
+    let _ = app.emit_to(target_label, WALK_PICKER_CANCEL_EVENT, ());
 
     Ok(())
 }
@@ -139,17 +148,18 @@ pub fn emit_walk_picker_cancel(app: &AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn submit_target_picker(
     app: AppHandle,
+    target_label: String,
     mode: String,
     anchor_x: f64,
     anchor_y: f64,
 ) -> Result<(), String> {
-    emit_target_picker_selected(&app, mode, anchor_x, anchor_y)?;
+    emit_target_picker_selected(&app, &target_label, mode, anchor_x, anchor_y)?;
     hide_walk_picker(app)
 }
 
 #[tauri::command]
-pub fn cancel_walk_picker(app: AppHandle) -> Result<(), String> {
-    emit_walk_picker_cancel(&app)?;
+pub fn cancel_walk_picker(app: AppHandle, target_label: String) -> Result<(), String> {
+    emit_walk_picker_cancel(&app, &target_label)?;
     hide_walk_picker(app)
 }
 

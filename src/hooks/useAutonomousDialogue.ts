@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
+import { pickDialogueLine } from "../services/dialogueManager";
+import type { DialogueSettings } from "../types/character";
 import type { CompanionBehaviorState } from "../types/companion";
-import { pickRandomMotivationalQuote } from "../utils/pickRandomQuote";
 
 const MIN_AUTONOMOUS_DIALOGUE_MS = 20000;
 const MAX_AUTONOMOUS_DIALOGUE_MS = 50000;
-const AUTONOMOUS_DIALOGUE_CHANCE = 0.2;
+const DEFAULT_AUTONOMOUS_DIALOGUE_CHANCE = 0.2;
 
 const ELIGIBLE_STATES: ReadonlySet<CompanionBehaviorState> = new Set([
   "idle",
@@ -28,6 +29,8 @@ interface UseAutonomousDialogueOptions {
   behaviorState: CompanionBehaviorState;
   behaviorStateRef: RefObject<CompanionBehaviorState>;
   startDialogue: (text: string) => void;
+  // the speaking companion's lines + how chatty it is (0..1)
+  dialogueSettings?: DialogueSettings;
 }
 
 export function useAutonomousDialogue({
@@ -37,12 +40,15 @@ export function useAutonomousDialogue({
   behaviorState,
   behaviorStateRef,
   startDialogue,
+  dialogueSettings,
 }: UseAutonomousDialogueOptions): void {
   const startDialogueRef = useRef(startDialogue);
+  const dialogueSettingsRef = useRef(dialogueSettings);
 
   useEffect(() => {
     startDialogueRef.current = startDialogue;
-  }, [startDialogue]);
+    dialogueSettingsRef.current = dialogueSettings;
+  }, [dialogueSettings, startDialogue]);
 
   useEffect(() => {
     if (!isReady || isFrozen || !isAutonomousDialogueEligible(behaviorState)) {
@@ -67,8 +73,13 @@ export function useAutonomousDialogue({
             return;
           }
 
-          if (Math.random() < AUTONOMOUS_DIALOGUE_CHANCE) {
-            startDialogueRef.current(pickRandomMotivationalQuote());
+          const settings = dialogueSettingsRef.current;
+          const chance = settings?.frequency ?? DEFAULT_AUTONOMOUS_DIALOGUE_CHANCE;
+
+          if (Math.random() < chance) {
+            startDialogueRef.current(
+              pickDialogueLine(settings ?? { lines: [], frequency: chance }),
+            );
           }
 
           scheduleNext();

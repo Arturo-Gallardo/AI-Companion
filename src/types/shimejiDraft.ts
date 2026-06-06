@@ -1,0 +1,31 @@
+import type { AnimationCategory, BehaviorSettings } from "./character";
+
+// a single source png picked from the Shimeji img folder
+export interface ShimejiSourceFrame {
+  name: string;
+  path: string;
+  url: string;
+}
+
+export interface CategoryAssignment {
+  // ordered list of source frame paths assigned to this category
+  frames: string[];
+  fps: number;
+}
+
+export type CategoryAssignments = Record<AnimationCategory, CategoryAssignment>;
+
+// in-progress (non-persisted) state for the Shimeji import wizard
+export interface ShimejiDraft {
+  imgDir: string | null;
+  sources: ShimejiSourceFrame[];
+  assignments: CategoryAssignments;
+  name: string;
+  dialogueLines: string[];
+  dialogueFrequency: number;
+  behavior: BehaviorSettings;
+  scale: number;
+  speed: number;
+  frameWidth: number;
+  frameHeight: number;
+}

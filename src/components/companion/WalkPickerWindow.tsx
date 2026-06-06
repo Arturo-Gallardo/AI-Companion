@@ -18,12 +18,15 @@ function toAnchorY(clientY: number, bounds: DesktopBounds): number {
 
 export function WalkPickerWindow() {
   const [mode, setMode] = useState<TargetPickerMode>("walk");
+  // the companion window that opened this picker; picker results route back to it
+  const [targetLabel, setTargetLabel] = useState<string | null>(null);
 
   useEffect(() => {
     let unlistenOpen: (() => void) | undefined;
 
-    void listenTargetPickerOpen(({ mode: nextMode }) => {
+    void listenTargetPickerOpen(({ mode: nextMode, targetLabel: nextTarget }) => {
       setMode(nextMode);
+      setTargetLabel(nextTarget);
     }).then((cleanup) => {
       unlistenOpen = cleanup;
     });
@@ -35,8 +38,8 @@ export function WalkPickerWindow() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        void cancelWalkPicker();
+      if (event.key === "Escape" && targetLabel !== null) {
+        void cancelWalkPicker(targetLabel);
       }
     };
 
@@ -45,12 +48,16 @@ export function WalkPickerWindow() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [targetLabel]);
 
   const handlePointerDown = async (event: React.PointerEvent<HTMLDivElement>) => {
+    if (targetLabel === null) {
+      return;
+    }
+
     if (event.button !== 0) {
       if (event.button === 2) {
-        void cancelWalkPicker();
+        void cancelWalkPicker(targetLabel);
       }
       return;
     }
@@ -59,12 +66,17 @@ export function WalkPickerWindow() {
 
     if (mode === "climb") {
       const anchorY = toAnchorY(event.clientY, bounds);
-      void submitTargetPicker("climb", 0, anchorY);
+      void submitTargetPicker(targetLabel, "climb", 0, anchorY);
       return;
     }
 
     const anchorX = toAnchorX(event.clientX, bounds);
-    void submitTargetPicker(mode === "crawl" ? "crawl" : "walk", anchorX, 0);
+    void submitTargetPicker(
+      targetLabel,
+      mode === "crawl" ? "crawl" : "walk",
+      anchorX,
+      0,
+    );
   };
 
   const cursorClass =

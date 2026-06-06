@@ -1,15 +1,17 @@
-use std::sync::Mutex;
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
 
 use serde::Serialize;
 use tauri::window::Color;
-use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
-
-use super::{
-    query_desktop_bounds, MonitorWorkArea, ANCHOR_X, DEFAULT_ANCHOR_Y_OFFSET, SPRITE_HEIGHT,
-    SPRITE_WIDTH,
+use tauri::{
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder,
 };
 
-pub const SPEECH_WINDOW_LABEL: &str = "companion-speech";
+use super::{
+    query_desktop_bounds, register_excluded_hwnd, MonitorWorkArea, ANCHOR_X,
+    DEFAULT_ANCHOR_Y_OFFSET, SPRITE_HEIGHT, SPRITE_WIDTH,
+};
+
 pub const COMPANION_SPEECH_CONTENT_EVENT: &str = "companion-speech-content";
 pub const COMPANION_SPEECH_DISMISS_EVENT: &str = "companion-speech-dismiss";
 pub const COMPANION_SPEECH_PLACEMENT_EVENT: &str = "companion-speech-placement";
@@ -18,6 +20,17 @@ pub const SPEECH_BUBBLE_GAP: f64 = 4.0;
 const SPEECH_INITIAL_WIDTH: f64 = 128.0;
 const SPEECH_INITIAL_HEIGHT: f64 = 32.0;
 const SPEECH_SIDE_GAP: f64 = 4.0;
+
+// one speech window per companion instance, labelled companion-speech-<id>
+pub fn speech_window_label(id: &str) -> String {
+    format!("companion-speech-{id}")
+}
+
+fn instance_id_from_speech_label(label: &str) -> Option<String> {
+    label
+        .strip_prefix("companion-speech-")
+        .map(|id| id.to_string())
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -52,8 +65,6 @@ struct SpeechWindowState {
     placement: SpeechBubblePlacement,
 }
 
-static PENDING_SPEECH_TEXT: Mutex<Option<String>> = Mutex::new(None);
-
 impl Default for SpeechWindowState {
     fn default() -> Self {
         Self {
@@ -67,27 +78,58 @@ impl Default for SpeechWindowState {
     }
 }
 
-static SPEECH_STATE: Mutex<SpeechWindowState> = Mutex::new(SpeechWindowState {
-    visible: false,
-    anchor_x: 0.0,
-    anchor_y: 0.0,
-    width: SPEECH_INITIAL_WIDTH,
-    height: SPEECH_INITIAL_HEIGHT,
-    placement: SpeechBubblePlacement::Above,
-});
+// per-instance speech state + pending bubble text, keyed by instance id
+static SPEECH_STATES: LazyLock<Mutex<HashMap<String, SpeechWindowState>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static PENDING_SPEECH_TEXT: LazyLock<Mutex<HashMap<String, String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
-fn read_speech_state() -> Result<SpeechWindowState, String> {
-    SPEECH_STATE
+fn read_speech_state(id: &str) -> SpeechWindowState {
+    SPEECH_STATES
         .lock()
-        .map(|state| *state)
-        .map_err(|error| format!("failed to read speech window state: {error}"))
+        .ok()
+        .and_then(|states| states.get(id).copied())
+        .unwrap_or_default()
 }
 
-fn update_speech_state(update: impl FnOnce(&mut SpeechWindowState)) -> Result<(), String> {
-    let mut state = SPEECH_STATE
-        .lock()
-        .map_err(|error| format!("failed to update speech window state: {error}"))?;
-    update(&mut state);
+fn update_speech_state(id: &str, update: impl FnOnce(&mut SpeechWindowState)) {
+    if let Ok(mut states) = SPEECH_STATES.lock() {
+        let entry = states.entry(id.to_string()).or_default();
+        update(entry);
+    }
+}
+
+// builds the hidden speech window for an instance if it isn't there yet.
+// pre-created alongside the companion so the bubble webview is mounted and
+// listening before the first line is spoken (otherwise it misses the content
+// event and never resizes past its 32px initial size).
+pub fn ensure_speech_window(app: &AppHandle, id: &str) -> Result<(), String> {
+    let label = speech_window_label(id);
+    if app.get_webview_window(&label).is_some() {
+        return Ok(());
+    }
+
+    let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::default())
+        .title("Companion Speech")
+        .inner_size(SPEECH_INITIAL_WIDTH, SPEECH_INITIAL_HEIGHT)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .background_color(Color(0, 0, 0, 0))
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(false)
+        .maximizable(false)
+        .minimizable(false)
+        .focused(false)
+        .visible(false)
+        .build()
+        .map_err(|error| format!("failed to create companion speech window: {error}"))?;
+
+    if let Ok(hwnd) = window.hwnd() {
+        register_excluded_hwnd(hwnd.0 as isize);
+    }
+
     Ok(())
 }
 
@@ -202,19 +244,16 @@ fn resolve_speech_bounds(
         mon_bottom,
     );
 
-    Ok(ResolvedSpeechBounds {
-        x,
-        y,
-        placement,
-    })
+    Ok(ResolvedSpeechBounds { x, y, placement })
 }
 
 fn emit_speech_placement(
     app: &AppHandle,
+    id: &str,
     placement: SpeechBubblePlacement,
 ) -> Result<(), String> {
     let _ = app.emit_to(
-        SPEECH_WINDOW_LABEL,
+        speech_window_label(id),
         COMPANION_SPEECH_PLACEMENT_EVENT,
         CompanionSpeechPlacementPayload { placement },
     );
@@ -224,6 +263,7 @@ fn emit_speech_placement(
 
 fn apply_companion_speech_bounds(
     app: &AppHandle,
+    id: &str,
     anchor_x: f64,
     anchor_y: f64,
     anchor_y_offset: f64,
@@ -231,7 +271,7 @@ fn apply_companion_speech_bounds(
     speech_height: f64,
     show_window: bool,
 ) -> Result<SpeechBubblePlacement, String> {
-    let previous = read_speech_state()?.placement;
+    let previous = read_speech_state(id).placement;
     let resolved = resolve_speech_bounds(
         anchor_x,
         anchor_y,
@@ -241,7 +281,7 @@ fn apply_companion_speech_bounds(
     )?;
 
     let window = app
-        .get_webview_window(SPEECH_WINDOW_LABEL)
+        .get_webview_window(&speech_window_label(id))
         .ok_or_else(|| "companion speech window not found".to_string())?;
 
     window
@@ -255,12 +295,12 @@ fn apply_companion_speech_bounds(
         ))
         .map_err(|error| format!("failed to reposition companion speech window: {error}"))?;
 
-    update_speech_state(|stored| {
+    update_speech_state(id, |stored| {
         stored.placement = resolved.placement;
-    })?;
+    });
 
     if previous != resolved.placement {
-        emit_speech_placement(app, resolved.placement)?;
+        emit_speech_placement(app, id, resolved.placement)?;
     }
 
     if show_window {
@@ -272,56 +312,31 @@ fn apply_companion_speech_bounds(
     Ok(resolved.placement)
 }
 
-pub fn create_companion_speech_window(app: &AppHandle) -> Result<(), String> {
-    if app.get_webview_window(SPEECH_WINDOW_LABEL).is_some() {
-        return Ok(());
-    }
-
-    let speech_window = WebviewWindowBuilder::new(app, SPEECH_WINDOW_LABEL, WebviewUrl::default())
-        .title("Companion Speech")
-        .inner_size(SPEECH_INITIAL_WIDTH, SPEECH_INITIAL_HEIGHT)
-        .decorations(false)
-        .transparent(true)
-        .shadow(false)
-        .background_color(Color(0, 0, 0, 0))
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .resizable(false)
-        .maximizable(false)
-        .minimizable(false)
-        .focused(false)
-        .visible(false)
-        .build()
-        .map_err(|error| format!("failed to create companion speech window: {error}"))?;
-
-    let _ = speech_window;
-
-    Ok(())
-}
-
 pub fn sync_companion_speech_position(
     app: &AppHandle,
+    id: &str,
     anchor_x: f64,
     anchor_y: f64,
     anchor_y_offset: f64,
 ) -> Result<(), String> {
-    let state = read_speech_state()?;
+    let state = read_speech_state(id);
 
     if !state.visible {
-      return Ok(());
-    }
-
-    if app.get_webview_window(SPEECH_WINDOW_LABEL).is_none() {
         return Ok(());
     }
 
-    update_speech_state(|stored| {
+    if app.get_webview_window(&speech_window_label(id)).is_none() {
+        return Ok(());
+    }
+
+    update_speech_state(id, |stored| {
         stored.anchor_x = anchor_x;
         stored.anchor_y = anchor_y;
-    })?;
+    });
 
     let _ = apply_companion_speech_bounds(
         app,
+        id,
         anchor_x,
         anchor_y,
         anchor_y_offset,
@@ -334,42 +349,53 @@ pub fn sync_companion_speech_position(
 }
 
 #[tauri::command]
-pub fn take_companion_speech_content() -> Result<Option<String>, String> {
+pub fn take_companion_speech_content(
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
+    let Some(id) = instance_id_from_speech_label(window.label()) else {
+        return Ok(None);
+    };
+
     let mut pending = PENDING_SPEECH_TEXT
         .lock()
         .map_err(|error| format!("failed to read pending speech content: {error}"))?;
 
-    Ok(pending.take())
+    Ok(pending.remove(&id))
 }
 
+// async so the lazy speech-window build runs off the main thread (see the note
+// on create_companion_instance_window — a sync build would deadlock).
 #[tauri::command]
-pub fn show_companion_speech(
-    app: AppHandle,
+pub async fn show_companion_speech(
+    window: tauri::WebviewWindow,
     text: String,
     anchor_x: f64,
     anchor_y: f64,
 ) -> Result<(), String> {
-    if app.get_webview_window(SPEECH_WINDOW_LABEL).is_none() {
-        return Err("companion speech window not found".to_string());
-    }
+    let id = super::instance_id_from_companion_label(window.label())
+        .ok_or_else(|| "speech requested from a non-companion window".to_string())?;
+
+    let app = window.app_handle();
+    ensure_speech_window(app, &id)?;
 
     {
         let mut pending = PENDING_SPEECH_TEXT
             .lock()
             .map_err(|error| format!("failed to store pending speech content: {error}"))?;
-        *pending = Some(text.clone());
+        pending.insert(id.clone(), text.clone());
     }
 
-    update_speech_state(|state| {
+    update_speech_state(&id, |state| {
         state.visible = true;
         state.anchor_x = anchor_x;
         state.anchor_y = anchor_y;
         state.width = SPEECH_INITIAL_WIDTH;
         state.height = SPEECH_INITIAL_HEIGHT;
-    })?;
+    });
 
     let placement = apply_companion_speech_bounds(
-        &app,
+        app,
+        &id,
         anchor_x,
         anchor_y,
         DEFAULT_ANCHOR_Y_OFFSET,
@@ -379,7 +405,7 @@ pub fn show_companion_speech(
     )?;
 
     let _ = app.emit_to(
-        SPEECH_WINDOW_LABEL,
+        speech_window_label(&id),
         COMPANION_SPEECH_CONTENT_EVENT,
         CompanionSpeechContentPayload {
             text,
@@ -392,22 +418,19 @@ pub fn show_companion_speech(
     Ok(())
 }
 
-#[tauri::command]
-pub fn hide_companion_speech(app: AppHandle) -> Result<(), String> {
-    {
-        let mut pending = PENDING_SPEECH_TEXT
-            .lock()
-            .map_err(|error| format!("failed to clear pending speech content: {error}"))?;
-        *pending = None;
+// hides the speech bubble for a specific instance id.
+pub fn hide_companion_speech_for(app: &AppHandle, id: &str) -> Result<(), String> {
+    if let Ok(mut pending) = PENDING_SPEECH_TEXT.lock() {
+        pending.remove(id);
     }
 
-    update_speech_state(|state| {
+    update_speech_state(id, |state| {
         state.visible = false;
-    })?;
+    });
 
-    let _ = app.emit_to(SPEECH_WINDOW_LABEL, COMPANION_SPEECH_DISMISS_EVENT, ());
+    let _ = app.emit_to(speech_window_label(id), COMPANION_SPEECH_DISMISS_EVENT, ());
 
-    if let Some(window) = app.get_webview_window(SPEECH_WINDOW_LABEL) {
+    if let Some(window) = app.get_webview_window(&speech_window_label(id)) {
         window
             .hide()
             .map_err(|error| format!("failed to hide companion speech window: {error}"))?;
@@ -416,21 +439,56 @@ pub fn hide_companion_speech(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-pub fn set_companion_speech_size(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
-    let state = read_speech_state()?;
+// closes the speech window for an instance and forgets its state. used when a
+// companion is disabled/removed so its paired bubble goes away too.
+pub fn destroy_companion_speech_window(app: &AppHandle, id: &str) -> Result<(), String> {
+    let _ = hide_companion_speech_for(app, id);
 
+    if let Some(window) = app.get_webview_window(&speech_window_label(id)) {
+        window
+            .close()
+            .map_err(|error| format!("failed to close companion speech window: {error}"))?;
+    }
+
+    if let Ok(mut states) = SPEECH_STATES.lock() {
+        states.remove(id);
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn hide_companion_speech(window: tauri::WebviewWindow) -> Result<(), String> {
+    let Some(id) = super::instance_id_from_companion_label(window.label()) else {
+        return Ok(());
+    };
+
+    hide_companion_speech_for(window.app_handle(), &id)
+}
+
+#[tauri::command]
+pub fn set_companion_speech_size(
+    window: tauri::WebviewWindow,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    let Some(id) = instance_id_from_speech_label(window.label()) else {
+        return Ok(());
+    };
+
+    let state = read_speech_state(&id);
     if !state.visible {
         return Ok(());
     }
 
-    update_speech_state(|stored| {
+    update_speech_state(&id, |stored| {
         stored.width = width;
         stored.height = height;
-    })?;
+    });
 
     let _ = apply_companion_speech_bounds(
-        &app,
+        window.app_handle(),
+        &id,
         state.anchor_x,
         state.anchor_y,
         DEFAULT_ANCHOR_Y_OFFSET,

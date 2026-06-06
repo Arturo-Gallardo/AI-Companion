@@ -10,11 +10,21 @@ import "./index.css";
 
 const windowLabel = getCurrentWebviewWindow().label;
 
-if (windowLabel === "companion") {
+// per-instance windows use companion-<id> / companion-speech-<id> labels
+const isCompanionSpeechWindow =
+  windowLabel === "companion-speech" ||
+  windowLabel.startsWith("companion-speech-");
+const isCompanionSpriteWindow =
+  windowLabel === "companion" ||
+  (windowLabel.startsWith("companion-") &&
+    windowLabel !== "companion-menu" &&
+    !isCompanionSpeechWindow);
+
+if (isCompanionSpriteWindow) {
   document.documentElement.classList.add("companion-root");
 }
 
-if (windowLabel === "companion-speech") {
+if (isCompanionSpeechWindow) {
   document.documentElement.classList.add("companion-speech-root");
 }
 
@@ -27,8 +37,8 @@ if (windowLabel === "walk-picker") {
 }
 
 const isOverlayWebview =
-  windowLabel === "companion" ||
-  windowLabel === "companion-speech" ||
+  isCompanionSpriteWindow ||
+  isCompanionSpeechWindow ||
   windowLabel === "companion-menu" ||
   windowLabel === "walk-picker";
 

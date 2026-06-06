@@ -3,14 +3,18 @@ mod speech;
 mod walk_picker;
 mod window_surfaces;
 
+use std::collections::HashSet;
+use std::sync::{LazyLock, Mutex};
+
 use serde::Serialize;
 use tauri::window::Color;
 use tauri::{AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 
 pub use menu::{create_companion_menu_window, hide_companion_menu, show_companion_menu};
 pub use speech::{
-    create_companion_speech_window, hide_companion_speech, set_companion_speech_size,
-    show_companion_speech, sync_companion_speech_position, take_companion_speech_content,
+    destroy_companion_speech_window, ensure_speech_window, hide_companion_speech,
+    set_companion_speech_size, show_companion_speech, sync_companion_speech_position,
+    take_companion_speech_content,
 };
 pub use walk_picker::{
     cancel_walk_picker, create_walk_picker_window, hide_walk_picker, show_walk_picker,
@@ -18,21 +22,45 @@ pub use walk_picker::{
 };
 pub use window_surfaces::{
     get_window_surfaces, hit_title_bar_at, hit_window_bottom_at, hit_window_wall_at,
-    register_excluded_hwnds_from_app,
+    register_excluded_hwnd, register_excluded_hwnds_from_app,
 };
 
 pub const SPRITE_WIDTH: f64 = 128.0;
 pub const SPRITE_HEIGHT: f64 = 128.0;
 pub const ANCHOR_X: f64 = 64.0;
+pub const DEFAULT_ANCHOR_X_OFFSET: f64 = 64.0;
 pub const DEFAULT_ANCHOR_Y_OFFSET: f64 = 128.0;
+
+// guards concurrent async creates for the same instance id (react strict mode
+// can fire bootstrap twice before the first build finishes)
+static COMPANION_CREATING: LazyLock<Mutex<HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
+
+// each on-screen companion is its own window labelled companion-<instanceId>
+pub fn companion_window_label(id: &str) -> String {
+    format!("companion-{id}")
+}
+
+// the instance id for a companion window, or None for sibling windows
+// (speech/menu/walk-picker) that happen to share the companion- prefix.
+pub fn instance_id_from_companion_label(label: &str) -> Option<String> {
+    if label.starts_with("companion-speech-") {
+        return None;
+    }
+
+    label
+        .strip_prefix("companion-")
+        .map(|id| id.to_string())
+}
 
 pub(crate) fn companion_window_position(
     anchor_x: f64,
     anchor_y: f64,
+    anchor_x_offset: f64,
     anchor_y_offset: f64,
 ) -> (i32, i32) {
     (
-        (anchor_x - ANCHOR_X) as i32,
+        (anchor_x - anchor_x_offset) as i32,
         (anchor_y - anchor_y_offset) as i32,
     )
 }
@@ -206,88 +234,117 @@ pub fn get_desktop_bounds() -> Result<DesktopBounds, String> {
 
 #[tauri::command]
 pub fn set_companion_position(
-    app: AppHandle,
+    window: tauri::WebviewWindow,
     x: f64,
     y: f64,
+    anchor_x_offset: Option<f64>,
     anchor_y_offset: Option<f64>,
 ) -> Result<(), String> {
-    let window = app
-        .get_webview_window("companion")
-        .ok_or_else(|| "companion window not found".to_string())?;
+    let x_offset = anchor_x_offset.unwrap_or(DEFAULT_ANCHOR_X_OFFSET);
+    let y_offset = anchor_y_offset.unwrap_or(DEFAULT_ANCHOR_Y_OFFSET);
+    let (window_x, window_y) = companion_window_position(x, y, x_offset, y_offset);
 
-    let anchor_offset = anchor_y_offset.unwrap_or(DEFAULT_ANCHOR_Y_OFFSET);
-    let (window_x, window_y) = companion_window_position(x, y, anchor_offset);
-
+    // a companion window moves itself, so the caller is the right target
     window
         .set_position(PhysicalPosition::new(window_x, window_y))
         .map_err(|error| format!("failed to move companion window: {error}"))?;
 
-    let _ = sync_companion_speech_position(&app, x, y, anchor_offset);
+    if let Some(id) = instance_id_from_companion_label(window.label()) {
+        let _ = sync_companion_speech_position(window.app_handle(), &id, x, y, y_offset);
+    }
 
     Ok(())
 }
 
+// spawns (or reveals) the OS window for a single companion instance. x/y are
+// the window top-left in physical screen pixels.
+//
+// async on purpose: sync commands run on the main thread, and building a
+// webview window blocks until the main event loop creates it, so a sync version
+// deadlocks. running off-thread lets the loop service the build.
 #[tauri::command]
-pub fn set_companion_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
-    let window = app
-        .get_webview_window("companion")
-        .ok_or_else(|| "companion window not found".to_string())?;
+pub async fn create_companion_instance_window(
+    app: AppHandle,
+    id: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    let label = companion_window_label(&id);
 
-    if enabled {
-        window
+    if let Some(existing) = app.get_webview_window(&label) {
+        existing
             .show()
             .map_err(|error| format!("failed to show companion window: {error}"))?;
         return Ok(());
     }
 
-    let _ = hide_companion_speech(app.clone());
-    let _ = hide_companion_menu(app.clone());
-    let _ = hide_walk_picker(app);
-
-    window
-        .hide()
-        .map_err(|error| format!("failed to hide companion window: {error}"))?;
-
-    Ok(())
-}
-
-pub fn create_companion_window(app: &AppHandle) -> Result<(), String> {
-    if app.get_webview_window("companion").is_some() {
-        return Ok(());
+    {
+        let mut creating = COMPANION_CREATING
+            .lock()
+            .map_err(|error| format!("failed to lock companion create guard: {error}"))?;
+        if !creating.insert(id.clone()) {
+            // another invoke is already building this label — let it finish
+            return Ok(());
+        }
     }
 
-    let bounds = query_desktop_bounds()?;
-    let rightmost = bounds
-        .monitors
-        .iter()
-        .max_by_key(|monitor| monitor.x + monitor.width as i32)
-        .ok_or_else(|| "no monitors found".to_string())?;
+    let build_result: Result<(), String> = async {
+        let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::default())
+            .title("Companion")
+            .inner_size(width, height)
+            .position(x, y)
+            .decorations(false)
+            .transparent(true)
+            // shadows break transparency on windows and show as a grey box around the sprite
+            .shadow(false)
+            .background_color(Color(0, 0, 0, 0))
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .maximizable(false)
+            .minimizable(false)
+            .focused(false)
+            .visible(true)
+            .build()
+            .map_err(|error| format!("failed to create companion window: {error}"))?;
 
-    let start_x = rightmost.x as f64 + rightmost.width as f64 - ANCHOR_X;
-    let start_y = rightmost.y as f64 + rightmost.height as f64;
-    let (window_x, window_y) =
-        companion_window_position(start_x, start_y, DEFAULT_ANCHOR_Y_OFFSET);
+        // keep companions from grabbing each other as draggable surfaces
+        if let Ok(hwnd) = window.hwnd() {
+            register_excluded_hwnd(hwnd.0 as isize);
+        }
 
-    let companion_window = WebviewWindowBuilder::new(app, "companion", WebviewUrl::default())
-        .title("Companion")
-        .inner_size(SPRITE_WIDTH, SPRITE_HEIGHT)
-        .position(window_x as f64, window_y as f64)
-        .decorations(false)
-        .transparent(true)
-        // shadows break transparency on windows and show as a grey box around the sprite
-        .shadow(false)
-        .background_color(Color(0, 0, 0, 0))
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .resizable(false)
-        .maximizable(false)
-        .minimizable(false)
-        .focused(false)
-        .visible(true)
-        .build()
-        .map_err(|error| format!("failed to create companion window: {error}"))?;
+        Ok(())
+    }
+    .await;
 
-    let _ = companion_window;
+    if let Ok(mut creating) = COMPANION_CREATING.lock() {
+        creating.remove(&id);
+    }
+
+    build_result
+}
+
+// spawns the hidden speech bubble window for an instance. kept separate from
+// the companion create so we never nest two webview builds in one command.
+#[tauri::command]
+pub async fn create_companion_speech_instance_window(
+    app: AppHandle,
+    id: String,
+) -> Result<(), String> {
+    ensure_speech_window(&app, &id)
+}
+
+#[tauri::command]
+pub fn destroy_companion_instance_window(app: AppHandle, id: String) -> Result<(), String> {
+    let _ = destroy_companion_speech_window(&app, &id);
+
+    if let Some(window) = app.get_webview_window(&companion_window_label(&id)) {
+        window
+            .close()
+            .map_err(|error| format!("failed to close companion window: {error}"))?;
+    }
 
     Ok(())
 }

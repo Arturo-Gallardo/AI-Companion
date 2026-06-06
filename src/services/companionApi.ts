@@ -19,16 +19,36 @@ export async function getDesktopBounds(): Promise<DesktopBounds> {
 export async function setCompanionPosition(
   position: ScreenPosition,
   anchorYOffset = 128,
+  anchorXOffset = 64,
 ): Promise<void> {
   await invoke("set_companion_position", {
     x: position.x,
     y: position.y,
+    anchorXOffset,
     anchorYOffset,
   });
 }
 
-export async function setCompanionEnabled(enabled: boolean): Promise<void> {
-  await invoke("set_companion_enabled", { enabled });
+// spawns (or reveals) the OS window for a single companion instance.
+// x/y are the window top-left in physical screen pixels.
+export async function createCompanionInstanceWindow(
+  id: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): Promise<void> {
+  await invoke("create_companion_instance_window", { id, x, y, width, height });
+}
+
+export async function createCompanionSpeechInstanceWindow(
+  id: string,
+): Promise<void> {
+  await invoke("create_companion_speech_instance_window", { id });
+}
+
+export async function destroyCompanionInstanceWindow(id: string): Promise<void> {
+  await invoke("destroy_companion_instance_window", { id });
 }
 
 export async function getWindowSurfaces(): Promise<WindowSurface[]> {

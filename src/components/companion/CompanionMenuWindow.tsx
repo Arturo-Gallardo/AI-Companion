@@ -16,6 +16,8 @@ export function CompanionMenuWindow() {
   const [wallLocked, setWallLocked] = useState(false);
   const [undersideLocked, setUndersideLocked] = useState(false);
   const [frozen, setFrozen] = useState(false);
+  // companion window the chosen action should be routed back to
+  const [targetLabel, setTargetLabel] = useState<string | null>(null);
 
   useEffect(() => {
     let unlistenFocus: (() => void) | undefined;
@@ -36,10 +38,12 @@ export function CompanionMenuWindow() {
         wallLocked: nextWallLocked,
         undersideLocked: nextUndersideLocked,
         frozen: nextFrozen,
+        targetLabel: nextTarget,
       }) => {
         setWallLocked(nextWallLocked);
         setUndersideLocked(nextUndersideLocked);
         setFrozen(nextFrozen);
+        setTargetLabel(nextTarget);
       },
     ).then((cleanup) => {
       unlistenConfig = cleanup;
@@ -66,8 +70,12 @@ export function CompanionMenuWindow() {
   }, [frozen, undersideLocked, wallLocked]);
 
   const handleAction = (action: CompanionMenuAction) => {
+    if (targetLabel === null) {
+      return;
+    }
+
     void hideCompanionMenu().then(() => {
-      void emitCompanionMenuAction(action);
+      void emitCompanionMenuAction(targetLabel, action);
     });
   };
 

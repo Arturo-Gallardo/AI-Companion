@@ -6,9 +6,10 @@ export function useCompanionMirrorBroadcast(state: CompanionMirrorState): void {
   useEffect(() => {
     void emitMirrorState(state);
   }, [
+    state.instanceId,
     state.action,
     state.facing,
-    state.grabbedLeanFrame,
+    state.grabbedLeanTier,
     state.isDragging,
     state.behaviorState,
     state.dialogueText,

@@ -30,9 +30,10 @@ export async function hideCompanionMenu(): Promise<void> {
 }
 
 export async function emitCompanionMenuAction(
+  targetLabel: string,
   action: CompanionMenuAction,
 ): Promise<void> {
-  await emitTo("companion", COMPANION_MENU_ACTION_EVENT, {
+  await emitTo(targetLabel, COMPANION_MENU_ACTION_EVENT, {
     action,
   } satisfies CompanionMenuActionPayload);
 }

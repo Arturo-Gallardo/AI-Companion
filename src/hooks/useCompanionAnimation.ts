@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  DEFAULT_GRABBED_LEAN_FRAME,
-  getAnimationForAction,
-  getFramePath,
-  getFrameTickDuration,
-  TICK_INTERVAL_MS,
-} from "../animations/beyondBirthday";
-import type { AnimationDefinition, CompanionAction, FacingDirection } from "../animations/types";
+import { getFrameTickDuration, TICK_INTERVAL_MS } from "../animations/beyondBirthday";
+import type {
+  AnimationDefinition,
+  CompanionAction,
+  FacingDirection,
+  GrabbedLeanTier,
+} from "../animations/types";
+import type { AnimationRegistry } from "../services/animationRegistry";
 
 interface UseCompanionAnimationOptions {
+  registry: AnimationRegistry;
   action: CompanionAction;
   facing: FacingDirection;
-  grabbedLeanFrame?: string;
+  grabbedLeanTier?: GrabbedLeanTier;
   onTick?: (deltaX: number) => void;
   onClimbTick?: (deltaY: number) => void;
   onBounceComplete?: () => void;
@@ -29,9 +30,10 @@ function advanceFrameIndex(
 }
 
 export function useCompanionAnimation({
+  registry,
   action,
   facing,
-  grabbedLeanFrame = DEFAULT_GRABBED_LEAN_FRAME,
+  grabbedLeanTier = "neutral",
   onTick,
   onClimbTick,
   onBounceComplete,
@@ -42,6 +44,7 @@ export function useCompanionAnimation({
   const bounceCyclesRef = useRef(0);
   const actionRef = useRef(action);
   const facingRef = useRef(facing);
+  const registryRef = useRef(registry);
   const onTickRef = useRef(onTick);
   const onClimbTickRef = useRef(onClimbTick);
   const onBounceCompleteRef = useRef(onBounceComplete);
@@ -49,7 +52,8 @@ export function useCompanionAnimation({
   useEffect(() => {
     actionRef.current = action;
     facingRef.current = facing;
-  }, [action, facing]);
+    registryRef.current = registry;
+  }, [action, facing, registry]);
 
   useEffect(() => {
     onTickRef.current = onTick;
@@ -73,7 +77,7 @@ export function useCompanionAnimation({
 
     const intervalId = window.setInterval(() => {
       const activeAction = actionRef.current;
-      const animation = getAnimationForAction(activeAction);
+      const animation = registryRef.current.getAnimation(activeAction);
       const directionMultiplier = facingRef.current === "right" ? -1 : 1;
 
       if (
@@ -132,14 +136,15 @@ export function useCompanionAnimation({
 
   if (action === "grabbed") {
     return {
-      frameSrc: getFramePath(grabbedLeanFrame),
+      frameSrc: registry.getGrabbedLeanFrame(grabbedLeanTier),
     };
   }
 
-  const animation = getAnimationForAction(action);
+  const animation = registry.getAnimation(action);
   const frame = animation.frames[frameIndex] ?? animation.frames[0];
 
   return {
-    frameSrc: getFramePath(frame),
+    // registry frames are already resolved urls
+    frameSrc: frame,
   };
 }

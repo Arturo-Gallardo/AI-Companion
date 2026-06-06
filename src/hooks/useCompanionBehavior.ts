@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { showCompanionMenu } from "../services/companionMenuApi";
-import type { CompanionAction, FacingDirection } from "../animations/types";
+import type { AnimationRegistry } from "../services/animationRegistry";
+import type { DialogueSettings } from "../types/character";
+import type {
+  CompanionAction,
+  FacingDirection,
+  GrabbedLeanTier,
+} from "../animations/types";
 import { LANDING_THRESHOLD, resolveDisplayAction, usesTitleBarSitAnchor } from "../animations/beyondBirthday";
 import {
   type CompanionBehaviorState,
@@ -51,7 +57,7 @@ interface UseCompanionBehaviorResult {
   isReady: boolean;
   showTitleBarLockHint: boolean;
   wallSide: WindowWallSide | null;
-  grabbedLeanFrame: string;
+  grabbedLeanTier: GrabbedLeanTier;
   getAnchorPosition: () => ScreenPosition;
   onWalkTick: (deltaX: number) => void;
   onClimbTick: (deltaY: number) => void;
@@ -71,7 +77,17 @@ interface UseCompanionBehaviorResult {
   onContextMenu: (event: React.MouseEvent<HTMLElement>) => void;
 }
 
-export function useCompanionBehavior(): UseCompanionBehaviorResult {
+interface UseCompanionBehaviorOptions {
+  registry: AnimationRegistry;
+  initialAnchor?: ScreenPosition;
+  dialogueSettings?: DialogueSettings;
+}
+
+export function useCompanionBehavior({
+  registry,
+  initialAnchor,
+  dialogueSettings,
+}: UseCompanionBehaviorOptions): UseCompanionBehaviorResult {
   const handleSurfaceLockLostRef = useRef<() => void>(() => {});
   const usesTitleBarSitAnchorRef = useRef(false);
 
@@ -96,6 +112,8 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     clearSurfaceLock,
     tryLockSurfaceAt,
   } = useCompanionMovement({
+    registry,
+    initialAnchor,
     onSurfaceLockLost: () => {
       handleSurfaceLockLostRef.current();
     },
@@ -124,6 +142,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
   const behaviorStateRef = useRef(behaviorState);
   const dialogueReturnStateRef = useRef<"idle" | "sitting">("idle");
   const sittingModeRef = useRef<SittingMode>(null);
+  const sittingActionRef = useRef<CompanionAction>("sit");
 
   const isWallLockedRef = useRef(isWallLocked);
   const isUndersideLockedRef = useRef(isUndersideLocked);
@@ -255,7 +274,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
 
     if (dialogueReturnStateRef.current === "sitting") {
       setBehaviorState("sitting");
-      setAction("sit");
+      setAction(sittingActionRef.current);
       return;
     }
 
@@ -263,13 +282,18 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     setAction("idle");
   }, []);
 
-  const startSitting = useCallback((mode: "manual" | "auto") => {
-    targetXRef.current = null;
-    setDialogueText(null);
-    sittingModeRef.current = mode;
-    setBehaviorState("sitting");
-    setAction("sit");
-  }, []);
+  const startSitting = useCallback(
+    (mode: "manual" | "auto") => {
+      targetXRef.current = null;
+      setDialogueText(null);
+      sittingModeRef.current = mode;
+      const sitAction = registry.pickFloorSitAction();
+      sittingActionRef.current = sitAction;
+      setBehaviorState("sitting");
+      setAction(sitAction);
+    },
+    [registry],
+  );
 
   const toggleSit = useCallback(() => {
     const currentState = behaviorStateRef.current;
@@ -513,7 +537,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
       behaviorState === "dialoguing" ||
       behaviorState === "falling");
 
-  const { grabbedLeanFrame, onPointerDown } = useCompanionDrag({
+  const { grabbedLeanTier, onPointerDown } = useCompanionDrag({
     isEnabled: dragEnabled,
     skipResistDelay: skipResistOnGrab,
     getAnchorPosition,
@@ -875,6 +899,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     behaviorState,
     behaviorStateRef,
     startDialogue,
+    dialogueSettings,
   });
 
   const finishClimbing = useCallback(
@@ -1019,7 +1044,7 @@ export function useCompanionBehavior(): UseCompanionBehaviorResult {
     isReady,
     showTitleBarLockHint,
     wallSide,
-    grabbedLeanFrame,
+    grabbedLeanTier,
     getAnchorPosition,
     onWalkTick,
     onClimbTick,

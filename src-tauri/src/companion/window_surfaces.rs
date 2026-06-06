@@ -82,19 +82,10 @@ fn excluded_hwnds() -> std::sync::MutexGuard<'static, HashSet<isize>> {
 }
 
 pub fn register_excluded_hwnds_from_app(app: &tauri::AppHandle) -> Result<(), String> {
-    const LABELS: [&str; 5] = [
-        "main",
-        "companion",
-        "companion-speech",
-        "companion-menu",
-        "walk-picker",
-    ];
-
-    for label in LABELS {
-        if let Some(window) = app.get_webview_window(label) {
-            let hwnd = window
-                .hwnd()
-                .map_err(|error| format!("failed to read hwnd for {label}: {error}"))?;
+    // exclude every app-owned window (companion instances are created
+    // dynamically, so enumerate rather than hardcode labels)
+    for (_, window) in app.webview_windows() {
+        if let Ok(hwnd) = window.hwnd() {
             register_excluded_hwnd(hwnd.0 as isize);
         }
     }
