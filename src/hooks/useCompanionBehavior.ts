@@ -161,6 +161,7 @@ export function useCompanionBehavior({
 
   const targetXRef = useRef<number | null>(null);
   const targetYRef = useRef<number | null>(null);
+  const walkingCanAttachRef = useRef(false);
   const titleBarHoverProbeRef = useRef<number | null>(null);
   const anchorXRef = useRef(anchorX);
   const anchorYRef = useRef(anchorY);
@@ -641,13 +642,14 @@ export function useCompanionBehavior({
     },
   });
 
-  const startWalkingTo = useCallback((targetX: number) => {
+  const startWalkingTo = useCallback((targetX: number, canAttach = true) => {
     const currentX = anchorXRef.current;
     const direction: FacingDirection = targetX >= currentX ? "right" : "left";
 
     sittingModeRef.current = null;
     targetYRef.current = null;
     targetXRef.current = targetX;
+    walkingCanAttachRef.current = canAttach;
     setFacing(direction);
     setBehaviorState("walking");
     setAction("walk");
@@ -847,7 +849,7 @@ export function useCompanionBehavior({
         return;
       }
 
-      startWalkingTo(target);
+      startWalkingTo(target, false);
     }, randomIdleDelay(actionFrequency));
 
     return () => {
@@ -863,6 +865,57 @@ export function useCompanionBehavior({
     pickWalkTarget,
     startSitting,
     startWalkingTo,
+  ]);
+
+  // once manually attached to a wall, keep normal autonomous wall movement
+  useEffect(() => {
+    if (
+      !isReady ||
+      behaviorState !== "idle" ||
+      !isWallLocked ||
+      isFrozen ||
+      behaviorSettingsRef.current.actionFrequency <= 0
+    ) {
+      return;
+    }
+
+    const actionFrequency = behaviorSettingsRef.current.actionFrequency;
+
+    const timeoutId = window.setTimeout(() => {
+      if (behaviorStateRef.current !== "idle" || isFrozenRef.current) {
+        return;
+      }
+
+      const range = getVerticalClimbRange();
+      if (!range) {
+        return;
+      }
+
+      let nextTarget = randomBetween(range.minY, range.maxY);
+
+      if (Math.abs(nextTarget - anchorYRef.current) < 48) {
+        nextTarget =
+          nextTarget >= anchorYRef.current ? range.minY : range.maxY;
+      }
+
+      if (Math.abs(nextTarget - anchorYRef.current) < 48) {
+        return;
+      }
+
+      startClimbingTo(nextTarget);
+    }, randomIdleDelay(actionFrequency));
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    behaviorSettings,
+    behaviorState,
+    getVerticalClimbRange,
+    isFrozen,
+    isReady,
+    isWallLocked,
+    startClimbingTo,
   ]);
 
   // window bottom crawl — horizontal autonomous moves
@@ -973,7 +1026,10 @@ export function useCompanionBehavior({
 
   const tryFinishWalkAtWall = useCallback(
     async (fallbackX: number) => {
-      if (isUndersideLockedRef.current) {
+      if (
+        isUndersideLockedRef.current ||
+        !walkingCanAttachRef.current
+      ) {
         await finishWalking(fallbackX);
         return;
       }

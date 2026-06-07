@@ -129,6 +129,24 @@ fn title_bar_band_height() -> i32 {
 }
 
 #[cfg(windows)]
+fn is_cloaked(hwnd: windows::Win32::Foundation::HWND) -> bool {
+    use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
+
+    let mut cloaked = 0u32;
+
+    unsafe {
+        DwmGetWindowAttribute(
+            hwnd,
+            DWMWA_CLOAKED,
+            std::ptr::addr_of_mut!(cloaked).cast(),
+            std::mem::size_of_val(&cloaked) as u32,
+        )
+        .is_ok()
+            && cloaked != 0
+    }
+}
+
+#[cfg(windows)]
 fn surface_from_hwnd(hwnd: windows::Win32::Foundation::HWND) -> Option<WindowSurface> {
     use windows::Win32::Foundation::RECT;
     use windows::Win32::UI::WindowsAndMessaging::{
@@ -143,7 +161,7 @@ fn surface_from_hwnd(hwnd: windows::Win32::Foundation::HWND) -> Option<WindowSur
     }
 
     unsafe {
-        if !IsWindowVisible(hwnd).as_bool() || IsIconic(hwnd).as_bool() {
+        if !IsWindowVisible(hwnd).as_bool() || IsIconic(hwnd).as_bool() || is_cloaked(hwnd) {
             return None;
         }
 
