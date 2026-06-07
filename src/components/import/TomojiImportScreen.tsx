@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { TomojiPageHeader } from "../dashboard/TomojiPageHeader";
+import { TomojiPageLayout } from "../dashboard/TomojiPageLayout";
 import {
   importTomojiFromFolder,
   type TomojiImportResult,
@@ -41,21 +43,16 @@ export function TomojiImportScreen({
   };
 
   return (
-    <section className="min-h-0 flex-1 overflow-y-auto px-12 py-10">
-      <header className="mb-6 flex items-center gap-4">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:border-white hover:text-white"
-        >
-          Back
-        </button>
-        <h1 className="text-xl font-bold text-white">Import Tomoji</h1>
-      </header>
-
-      <p className="mb-6 max-w-xl text-sm text-neutral-400">
+    <TomojiPageLayout
+      header={
+        <TomojiPageHeader title="Import Tomoji" onBack={onClose} />
+      }
+    >
+      <p className="mb-8 max-w-xl text-sm leading-relaxed text-neutral-400">
         Select a Tomoji character folder. It must contain a
-        <code className="mx-1 rounded bg-neutral-800 px-1">manifest.json</code>
+        <code className="mx-1 rounded bg-neutral-800 px-1.5 py-0.5 text-neutral-200">
+          manifest.json
+        </code>
         and the sprite files it references.
       </p>
 
@@ -69,7 +66,7 @@ export function TomojiImportScreen({
       </button>
 
       {result ? (
-        <div className="mt-6 max-w-xl space-y-3">
+        <div className="mt-8 max-w-xl space-y-3">
           {result.ok ? (
             <p className="rounded-lg border border-green-600/50 bg-green-500/10 px-4 py-3 text-sm text-green-300">
               Imported successfully.
@@ -93,6 +90,6 @@ export function TomojiImportScreen({
           ) : null}
         </div>
       ) : null}
-    </section>
+    </TomojiPageLayout>
   );
 }

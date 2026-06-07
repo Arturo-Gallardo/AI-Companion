@@ -4,6 +4,7 @@ import { getAppDataDir, joinPath } from "./fileSystemAdapter";
 // agree on where things live:
 //   <appData>/library.json
 //   <appData>/instances.json
+//   <appData>/characters/beyond-birthday/manifest.json  (bundled pet, seeded on first run)
 //   <appData>/characters/<id>/manifest.json
 //   <appData>/characters/<id>/sprites/<category>/*.png
 

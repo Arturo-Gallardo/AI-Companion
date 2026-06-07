@@ -20,7 +20,7 @@ export const DEFAULT_COMPANION_MIRROR_STATE: CompanionMirrorState = {
   instanceId: "default",
   action: "idle",
   facing: "left",
-  grabbedLeanTier: "neutral",
+  grabbedLeanTier: "lightLeft",
   isDragging: false,
   behaviorState: "idle",
   dialogueText: null,

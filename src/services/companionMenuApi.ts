@@ -1,5 +1,6 @@
-import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { emitTo, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { listenOnThisWebview } from "./companionInstanceContext";
 import type {
   CompanionMenuAction,
   CompanionMenuActionPayload,
@@ -41,7 +42,7 @@ export async function emitCompanionMenuAction(
 export async function listenCompanionMenuAction(
   handler: (payload: CompanionMenuActionPayload) => void,
 ): Promise<UnlistenFn> {
-  return listen<CompanionMenuActionPayload>(
+  return listenOnThisWebview<CompanionMenuActionPayload>(
     COMPANION_MENU_ACTION_EVENT,
     (event) => {
       handler(event.payload);
@@ -52,7 +53,7 @@ export async function listenCompanionMenuAction(
 export async function listenCompanionMenuConfig(
   handler: (payload: CompanionMenuConfigPayload) => void,
 ): Promise<UnlistenFn> {
-  return listen<CompanionMenuConfigPayload>(
+  return listenOnThisWebview<CompanionMenuConfigPayload>(
     COMPANION_MENU_CONFIG_EVENT,
     (event) => {
       handler(event.payload);

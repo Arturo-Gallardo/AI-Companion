@@ -2,7 +2,11 @@ import { emitDialogueStart } from "../../services/companionDialogue";
 import { emitFreezeToggle } from "../../services/companionFreeze";
 import { emitSitToggle } from "../../services/companionSit";
 import { useCompanionMirrorState } from "../../hooks/useCompanionMirrorState";
-import { pickRandomMotivationalQuote } from "../../utils/pickRandomQuote";
+import {
+  hasDialogueLines,
+  pickDialogueLine,
+} from "../../services/dialogueManager";
+import type { CompanionInstance } from "../../types/companionInstance";
 
 const BLOCKED_COMPANION_COMMAND_STATES = new Set([
   "dragging",
@@ -11,21 +15,36 @@ const BLOCKED_COMPANION_COMMAND_STATES = new Set([
   "climbing",
 ]);
 
-export function DashboardOptionsPanel() {
-  const mirrorState = useCompanionMirrorState();
+interface DashboardOptionsPanelProps {
+  instance: CompanionInstance;
+}
+
+export function DashboardOptionsPanel({ instance }: DashboardOptionsPanelProps) {
+  const mirrorState = useCompanionMirrorState(instance.id);
   const isCommandBlocked = BLOCKED_COMPANION_COMMAND_STATES.has(
     mirrorState.behaviorState,
   );
   const isSitting = mirrorState.behaviorState === "sitting";
   const canToggleSit = isSitting || !isCommandBlocked;
   const isFrozen = mirrorState.isFrozen;
+  const canDialogue =
+    hasDialogueLines(instance.dialogueSettings, instance.characterId) &&
+    !isCommandBlocked;
 
   const handleDialogueClick = () => {
-    if (isCommandBlocked) {
+    if (!canDialogue) {
       return;
     }
 
-    void emitDialogueStart(pickRandomMotivationalQuote());
+    const line = pickDialogueLine(
+      instance.dialogueSettings,
+      instance.characterId,
+    );
+    if (line === null) {
+      return;
+    }
+
+    void emitDialogueStart(line, instance.id);
   };
 
   const handleSitClick = () => {
@@ -33,11 +52,11 @@ export function DashboardOptionsPanel() {
       return;
     }
 
-    void emitSitToggle();
+    void emitSitToggle(instance.id);
   };
 
   const handleFreezeClick = () => {
-    void emitFreezeToggle();
+    void emitFreezeToggle(instance.id);
   };
 
   return (
@@ -47,7 +66,7 @@ export function DashboardOptionsPanel() {
           <button
             type="button"
             onClick={handleDialogueClick}
-            disabled={isCommandBlocked}
+            disabled={!canDialogue}
             className="flex flex-1 items-center justify-center rounded-md border-2 border-neutral-600/70 text-lg text-neutral-200 enabled:hover:border-neutral-400/80 enabled:hover:text-white disabled:cursor-default disabled:opacity-50"
           >
             Dialogue

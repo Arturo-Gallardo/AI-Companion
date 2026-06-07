@@ -1,14 +1,54 @@
 import { useState } from "react";
-import { getFramePath } from "../../animations/beyondBirthday";
-import { BUILTIN_CHARACTER_ID } from "../../services/characterLibrary";
+import { useCharacterAnimationRegistry } from "../../hooks/useCharacterAnimationRegistry";
+import type { AnimationRegistry } from "../../services/animationRegistry";
 import type { CompanionInstance } from "../../types/companionInstance";
 import { CompanionSprite } from "../companion/CompanionSprite";
+
+const CARD_SPRITE_HEIGHT = 72;
 
 interface TomojiCardProps {
   instance: CompanionInstance;
   onDelete: (id: string) => void;
   onToggle: (id: string, enabled: boolean) => void;
   onEdit: (id: string) => void;
+}
+
+interface TomojiCardSpriteProps {
+  registry: AnimationRegistry;
+}
+
+function TomojiCardSprite({ registry }: TomojiCardSpriteProps) {
+  const idleFrame = registry.getAnimation("idle").frames[0];
+  const scale = CARD_SPRITE_HEIGHT / registry.spriteHeight;
+
+  return (
+    <CompanionSprite
+      frameSrc={idleFrame}
+      facing="left"
+      action="idle"
+      interactive={false}
+      scale={scale}
+      spriteWidth={registry.spriteWidth}
+      spriteHeight={registry.spriteHeight}
+      spriteAnchor={registry.getSpriteAnchor("idle")}
+    />
+  );
+}
+
+function TomojiCardSpriteLoader({ characterId }: { characterId: string }) {
+  const registry = useCharacterAnimationRegistry(characterId);
+
+  if (!registry) {
+    return (
+      <div
+        className="rounded-lg bg-neutral-800/80 animate-pulse"
+        style={{ width: CARD_SPRITE_HEIGHT * 0.75, height: CARD_SPRITE_HEIGHT * 0.75 }}
+        aria-hidden
+      />
+    );
+  }
+
+  return <TomojiCardSprite registry={registry} />;
 }
 
 export function TomojiCard({
@@ -18,7 +58,6 @@ export function TomojiCard({
   onEdit,
 }: TomojiCardProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const isBuiltin = instance.characterId === BUILTIN_CHARACTER_ID;
 
   const handleDelete = () => {
     onDelete(instance.id);
@@ -32,7 +71,7 @@ export function TomojiCard({
 
   return (
     <article
-      className={`relative flex h-36 w-36 flex-col items-center justify-between rounded-2xl border px-3 py-3 ${
+      className={`relative flex aspect-square w-full max-w-[11rem] flex-col items-center justify-between rounded-2xl border px-4 py-4 ${
         instance.enabled ? "border-white" : "border-neutral-500/80"
       } bg-neutral-950`}
     >
@@ -62,19 +101,7 @@ export function TomojiCard({
       </div>
 
       <div className="flex h-[72px] items-center justify-center">
-        {isBuiltin ? (
-          <CompanionSprite
-            frameSrc={getFramePath("shime1.png")}
-            facing="left"
-            action="idle"
-            interactive={false}
-            scale={0.64}
-          />
-        ) : (
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-800 text-lg font-bold text-neutral-300">
-            {instance.name.charAt(0).toUpperCase()}
-          </div>
-        )}
+        <TomojiCardSpriteLoader characterId={instance.characterId} />
       </div>
 
       <p className="w-full truncate text-center text-sm font-bold text-white">

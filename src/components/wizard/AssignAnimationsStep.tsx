@@ -1,53 +1,82 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ANIMATION_CATEGORY_GROUPS,
   ANIMATION_CATEGORY_META,
+  type AnimationCategoryGroupId,
 } from "../../constants/animationCategories";
 import type { ShimejiDraftController } from "../../hooks/useShimejiDraft";
 import type { AnimationCategory } from "../../types/character";
 import { AnimationAssignmentPanel } from "./AnimationAssignmentPanel";
+import { AnimationCategoryGroupSection } from "./AnimationCategoryGroupSection";
 
 interface AssignAnimationsStepProps {
   controller: ShimejiDraftController;
 }
 
+const DEFAULT_OPEN_GROUPS = new Set<AnimationCategoryGroupId>(["ground"]);
+
+function groupForCategory(
+  category: AnimationCategory,
+): AnimationCategoryGroupId {
+  return ANIMATION_CATEGORY_META[category].group;
+}
+
 export function AssignAnimationsStep({ controller }: AssignAnimationsStepProps) {
   const [active, setActive] = useState<AnimationCategory>("idle");
+  const [openGroups, setOpenGroups] =
+    useState<Set<AnimationCategoryGroupId>>(DEFAULT_OPEN_GROUPS);
   const { draft } = controller;
 
-  return (
-    <div className="space-y-5">
-      {ANIMATION_CATEGORY_GROUPS.map((group) => (
-        <section key={group.id}>
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-500">
-            {group.label}
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {group.categories.map((category) => {
-              const count = draft.assignments[category].frames.length;
-              const meta = ANIMATION_CATEGORY_META[category];
-              return (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => setActive(category)}
-                  title={meta.description}
-                  className={`rounded-full px-3 py-1 text-xs font-bold ${
-                    active === category
-                      ? "bg-white text-black"
-                      : "bg-neutral-800 text-neutral-300 hover:text-white"
-                  }`}
-                >
-                  {meta.label}
-                  {count > 0 ? ` (${count})` : ""}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+  // keep the group for the active slot open when selection changes
+  useEffect(() => {
+    const groupId = groupForCategory(active);
+    setOpenGroups((current) => {
+      if (current.has(groupId)) {
+        return current;
+      }
+      return new Set([...current, groupId]);
+    });
+  }, [active]);
 
-      <AnimationAssignmentPanel controller={controller} category={active} />
+  const toggleGroup = (groupId: AnimationCategoryGroupId) => {
+    setOpenGroups((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
+
+  return (
+    <div className="flex gap-8">
+      <aside className="w-52 shrink-0">
+        <p className="mb-4 text-xs leading-relaxed text-neutral-400">
+          <span className="font-medium text-neutral-300">Idle</span> and{" "}
+          <span className="font-medium text-neutral-300">Walk</span> need at least
+          one frame. Expand a group to assign optional animations.
+        </p>
+
+        <nav className="space-y-2" aria-label="Animation categories">
+          {ANIMATION_CATEGORY_GROUPS.map((group) => (
+            <AnimationCategoryGroupSection
+              key={group.id}
+              group={group}
+              assignments={draft.assignments}
+              active={active}
+              isOpen={openGroups.has(group.id)}
+              onToggle={() => toggleGroup(group.id)}
+              onSelect={setActive}
+            />
+          ))}
+        </nav>
+      </aside>
+
+      <div className="min-w-0 flex-1">
+        <AnimationAssignmentPanel controller={controller} category={active} />
+      </div>
     </div>
   );
 }

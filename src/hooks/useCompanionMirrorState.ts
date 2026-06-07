@@ -14,6 +14,10 @@ export function useCompanionMirrorState(
   );
 
   useEffect(() => {
+    setMirrorState({ ...DEFAULT_COMPANION_MIRROR_STATE, instanceId });
+  }, [instanceId]);
+
+  useEffect(() => {
     let unlisten: (() => void) | undefined;
 
     void listenMirrorState((state) => {

@@ -1,3 +1,4 @@
+import type { EventCallback, UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 // label conventions shared between the dashboard and the per-instance windows:
@@ -37,4 +38,13 @@ export function instanceIdFromSpeechLabel(label: string): string | null {
 // the instance id of the window this code is running in (companion windows).
 export function getCurrentInstanceId(): string | null {
   return instanceIdFromLabel(getCurrentWebviewWindow().label);
+}
+
+// tauri event.listen() receives emitTo events on every webview; scoped listen
+// only gets events targeted at this window (see tauri-apps/tauri#11379).
+export async function listenOnThisWebview<T>(
+  event: string,
+  handler: EventCallback<T>,
+): Promise<UnlistenFn> {
+  return getCurrentWebviewWindow().listen(event, handler);
 }

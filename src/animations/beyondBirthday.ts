@@ -38,7 +38,7 @@ export const IDLE_ANIMATION: AnimationDefinition = {
 };
 
 export const WALK_ANIMATION: AnimationDefinition = {
-  frames: ["shime1.png", "shime2.png", "shime1.png", "shime3.png"],
+  frames: ["shime1.png", "shime2.png", "shime3.png"],
   tickDuration: 6,
   velocity: { x: -2, y: 0 },
 };
@@ -89,17 +89,15 @@ export const GRAB_WALL_ANIMATION: AnimationDefinition = {
   velocity: { x: 0, y: 0 },
 };
 
-export const CLIMB_WALL_UP_ANIMATION: AnimationDefinition = {
-  frames: ["shime14.png", "shime12.png", "shime13.png", "shime13.png"],
+export const CLIMB_WALL_ANIMATION: AnimationDefinition = {
+  frames: ["shime14.png", "shime12.png"],
   tickDuration: 4,
-  frameTickDurations: [16, 4, 4, 4],
+  frameTickDurations: [16, 4],
   velocity: { x: 0, y: -2 },
 };
 
 export const CLIMB_WALL_DOWN_ANIMATION: AnimationDefinition = {
-  frames: ["shime14.png", "shime12.png", "shime13.png", "shime13.png"],
-  tickDuration: 4,
-  frameTickDurations: [16, 4, 4, 4],
+  ...CLIMB_WALL_ANIMATION,
   velocity: { x: 0, y: 2 },
 };
 
@@ -138,6 +136,7 @@ export const GRAB_VELOCITY_STRONG = 6;
 export const GRAB_VELOCITY_MILD = 2;
 
 // hysteresis — enter higher, exit lower so slow drags dont flicker tiers
+export const GRAB_EXIT_LIGHT = 0.5;
 export const GRAB_ENTER_MILD = 2.5;
 export const GRAB_EXIT_MILD = 1;
 export const GRAB_ENTER_STRONG = 6.5;
@@ -163,7 +162,7 @@ const ANIMATION_BY_ACTION: Record<CompanionAction, AnimationDefinition> = {
   sitOnBar: TITLE_BAR_SIT_ANIMATION,
   dangleOnBar: TITLE_BAR_DANGLE_ANIMATION,
   grabWall: GRAB_WALL_ANIMATION,
-  climbWall: CLIMB_WALL_UP_ANIMATION,
+  climbWall: CLIMB_WALL_ANIMATION,
   climbWallDown: CLIMB_WALL_DOWN_ANIMATION,
   grabCeiling: GRAB_UNDERSIDE_ANIMATION,
   climbCeiling: CRAWL_UNDERSIDE_ANIMATION,
@@ -218,7 +217,9 @@ export function resolveDisplayAction(
   return action;
 }
 
-export function getSpriteAnchorForAction(action: CompanionAction): SpriteAnchor {
+export function getSpriteAnchorForAction(
+  action: CompanionAction,
+): SpriteAnchor {
   if (usesTitleBarSitAnchor(action)) {
     return TITLE_BAR_SIT_ANCHOR;
   }
@@ -238,18 +239,23 @@ export function getAnimationForAction(
 
 export function getGrabbedFrameFromLeanTier(tier: GrabbedLeanTier): string {
   switch (tier) {
+    case "lightLeft":
+      return DEFAULT_GRABBED_LEAN_FRAME;
     case "mildLeft":
       return "shime7.png";
     case "strongLeft":
       return "shime9.png";
+    case "lightRight":
+      return DEFAULT_GRABBED_LEAN_FRAME;
     case "mildRight":
       return "shime8.png";
     case "strongRight":
       return "shime10.png";
-    case "neutral":
-    default:
-      return DEFAULT_GRABBED_LEAN_FRAME;
   }
+}
+
+function lightTierFromLean(lean: number): GrabbedLeanTier {
+  return lean < 0 ? "lightLeft" : "lightRight";
 }
 
 // lean opposes drag direction — same feel as shimeji footX vs cursor offset
@@ -262,7 +268,12 @@ export function resolveGrabbedLeanTier(
   switch (previous) {
     case "strongLeft":
       if (lean > -GRAB_EXIT_STRONG) {
-        return lean > -GRAB_EXIT_MILD ? "neutral" : "mildLeft";
+        if (lean > -GRAB_EXIT_MILD) {
+          return lean > GRAB_EXIT_LIGHT
+            ? "lightRight"
+            : lightTierFromLean(lean);
+        }
+        return "mildLeft";
       }
       return "strongLeft";
 
@@ -271,13 +282,28 @@ export function resolveGrabbedLeanTier(
         return "strongLeft";
       }
       if (lean > -GRAB_EXIT_MILD) {
-        return "neutral";
+        return lean > GRAB_EXIT_LIGHT ? "lightRight" : "lightLeft";
       }
       return "mildLeft";
 
+    case "lightLeft":
+      if (lean < -GRAB_ENTER_STRONG) {
+        return "strongLeft";
+      }
+      if (lean < -GRAB_ENTER_MILD) {
+        return "mildLeft";
+      }
+      if (lean > GRAB_EXIT_LIGHT) {
+        return "lightRight";
+      }
+      return "lightLeft";
+
     case "strongRight":
       if (lean < GRAB_EXIT_STRONG) {
-        return lean < GRAB_EXIT_MILD ? "neutral" : "mildRight";
+        if (lean < GRAB_EXIT_MILD) {
+          return lean < -GRAB_EXIT_LIGHT ? "lightLeft" : "lightRight";
+        }
+        return "mildRight";
       }
       return "strongRight";
 
@@ -286,25 +312,27 @@ export function resolveGrabbedLeanTier(
         return "strongRight";
       }
       if (lean < GRAB_EXIT_MILD) {
-        return "neutral";
+        return lean < -GRAB_EXIT_LIGHT ? "lightLeft" : "lightRight";
       }
       return "mildRight";
 
-    case "neutral":
-    default:
-      if (lean < -GRAB_ENTER_MILD) {
-        return "mildLeft";
+    case "lightRight":
+      if (lean > GRAB_ENTER_STRONG) {
+        return "strongRight";
       }
       if (lean > GRAB_ENTER_MILD) {
         return "mildRight";
       }
-      return "neutral";
+      if (lean < -GRAB_EXIT_LIGHT) {
+        return "lightLeft";
+      }
+      return "lightRight";
   }
 }
 
 export function getGrabbedFrameFromVelocity(velocityX: number): string {
   return getGrabbedFrameFromLeanTier(
-    resolveGrabbedLeanTier("neutral", velocityX),
+    resolveGrabbedLeanTier("lightLeft", velocityX),
   );
 }
 

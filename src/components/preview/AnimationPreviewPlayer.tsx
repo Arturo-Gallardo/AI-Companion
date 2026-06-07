@@ -22,10 +22,7 @@ export function AnimationPreviewPlayer({
   const frameSrc = useAnimationPreviewPlayer(frames, fps, isPlaying);
 
   return (
-    <div
-      className="flex items-center justify-center"
-      style={{ width, height }}
-    >
+    <div className="flex items-center justify-center" style={{ width, height }}>
       {frameSrc ? (
         <img
           src={frameSrc}

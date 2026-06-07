@@ -16,7 +16,7 @@ export function DashboardBackgroundToggle({
       type="button"
       onClick={onCycle}
       aria-pressed={mode === "gray"}
-      className="absolute bottom-5 left-5 rounded-md border border-neutral-500/70 bg-neutral-900/80 px-3 py-2 text-sm text-neutral-100 transition hover:border-neutral-300/80 hover:text-white"
+      className="absolute bottom-3 left-3 rounded border border-neutral-600/80 bg-neutral-900/90 px-2 py-1 text-[11px] font-medium text-neutral-300 transition hover:border-neutral-400/80 hover:text-white"
     >
       {label}
     </button>

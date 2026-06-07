@@ -6,6 +6,10 @@ import type {
   FacingDirection,
   GrabbedLeanTier,
 } from "../animations/types";
+import {
+  getInitialWalkStep,
+  getWalkFrameIndex,
+} from "../animations/walkPlayback";
 import type { AnimationRegistry } from "../services/animationRegistry";
 
 interface UseCompanionAnimationOptions {
@@ -29,17 +33,47 @@ function advanceFrameIndex(
   return (currentIndex + 1) % animation.frames.length;
 }
 
+function usesShimejiCycle(
+  action: CompanionAction,
+  usesShimejiPlayback: boolean,
+): boolean {
+  return (
+    usesShimejiPlayback &&
+    (action === "walk" ||
+      action === "climbWall" ||
+      action === "climbWallDown")
+  );
+}
+
+function initialFrameIndex(
+  action: CompanionAction,
+  frameCount: number,
+  usesShimejiPlayback: boolean,
+): number {
+  if (usesShimejiCycle(action, usesShimejiPlayback)) {
+    return getWalkFrameIndex(getInitialWalkStep(), frameCount);
+  }
+
+  // sequential imports: climbing down starts on frame 2, then loops in order
+  if (action === "climbWallDown" && frameCount >= 2) {
+    return 1;
+  }
+
+  return 0;
+}
+
 export function useCompanionAnimation({
   registry,
   action,
   facing,
-  grabbedLeanTier = "neutral",
+  grabbedLeanTier = "lightLeft",
   onTick,
   onClimbTick,
   onBounceComplete,
 }: UseCompanionAnimationOptions): UseCompanionAnimationResult {
   const [frameIndex, setFrameIndex] = useState(0);
   const frameIndexRef = useRef(0);
+  const walkStepRef = useRef(0);
   const frameShownAtRef = useRef(performance.now());
   const bounceCyclesRef = useRef(0);
   const actionRef = useRef(action);
@@ -62,10 +96,21 @@ export function useCompanionAnimation({
   }, [onBounceComplete, onClimbTick, onTick]);
 
   useEffect(() => {
-    frameIndexRef.current = 0;
+    const animation = registryRef.current.getAnimation(action);
+    const frameCount = animation.frames.length;
+    const usesShimejiPlayback = registryRef.current.playbackStyle === "shimeji";
+
+    walkStepRef.current = usesShimejiCycle(action, usesShimejiPlayback)
+      ? getInitialWalkStep()
+      : 0;
+    frameIndexRef.current = initialFrameIndex(
+      action,
+      frameCount,
+      usesShimejiPlayback,
+    );
     frameShownAtRef.current = performance.now();
     bounceCyclesRef.current = 0;
-    setFrameIndex(0);
+    setFrameIndex(frameIndexRef.current);
   }, [action]);
 
   useEffect(() => {
@@ -78,6 +123,8 @@ export function useCompanionAnimation({
     const intervalId = window.setInterval(() => {
       const activeAction = actionRef.current;
       const animation = registryRef.current.getAnimation(activeAction);
+      const usesShimejiPlayback =
+        registryRef.current.playbackStyle === "shimeji";
       const directionMultiplier = facingRef.current === "right" ? -1 : 1;
 
       if (
@@ -119,6 +166,17 @@ export function useCompanionAnimation({
           return;
         }
 
+        frameIndexRef.current = nextIndex;
+        setFrameIndex(nextIndex);
+        return;
+      }
+
+      if (usesShimejiCycle(activeAction, usesShimejiPlayback)) {
+        walkStepRef.current += 1;
+        const nextIndex = getWalkFrameIndex(
+          walkStepRef.current,
+          animation.frames.length,
+        );
         frameIndexRef.current = nextIndex;
         setFrameIndex(nextIndex);
         return;

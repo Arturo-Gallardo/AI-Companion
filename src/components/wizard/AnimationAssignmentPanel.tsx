@@ -1,73 +1,79 @@
+import { useMemo } from "react";
 import { ANIMATION_CATEGORY_META } from "../../constants/animationCategories";
 import type { ShimejiDraftController } from "../../hooks/useShimejiDraft";
+import { isRequiredAnimationCategory } from "../../types/character";
 import type { AnimationCategory } from "../../types/character";
 import { AnimationPreviewPlayer } from "../preview/AnimationPreviewPlayer";
+import { FrameOrderList } from "./FrameOrderList";
+import { RequiredAnimationBadge } from "./AnimationCategoryBadge";
 
 interface AnimationAssignmentPanelProps {
   controller: ShimejiDraftController;
   category: AnimationCategory;
 }
 
-const PREVIEW_SIZE = 96;
+const PREVIEW_SIZE = 112;
 
-// assign / reorder / remove frames for a single animation category, with a
-// live looping preview that updates instantly.
+function countFrameUsage(frames: string[], path: string): number {
+  return frames.filter((frame) => frame === path).length;
+}
+
 export function AnimationAssignmentPanel({
   controller,
   category,
 }: AnimationAssignmentPanelProps) {
-  const { draft, urlFor, framesUrls, toggleFrame, removeFrame, moveFrame, setFps } =
-    controller;
+  const {
+    draft,
+    urlFor,
+    framesUrls,
+    addFrame,
+    removeFrame,
+    removeLastFrameByPath,
+    moveFrame,
+    setFps,
+  } = controller;
   const assignment = draft.assignments[category];
   const previewFrames = framesUrls(category);
   const meta = ANIMATION_CATEGORY_META[category];
+  const required = isRequiredAnimationCategory(category);
+  const missingRequired = required && assignment.frames.length === 0;
+  const canAdjustSpeed = assignment.frames.length > 1;
+
+  const nameByPath = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const source of draft.sources) {
+      map.set(source.path, source.name);
+    }
+    return map;
+  }, [draft.sources]);
+
+  const nameFor = (path: string) => nameByPath.get(path) ?? path;
 
   return (
-    <div className="grid grid-cols-[1fr_260px] gap-6">
-      <div>
-        <div className="mb-3 rounded-lg border border-neutral-800 bg-neutral-900/40 px-3 py-2">
+    <div className="space-y-6">
+      <div
+        className={`rounded-xl border px-4 py-3 ${
+          missingRequired
+            ? "border-amber-500/40 bg-amber-500/5"
+            : "border-neutral-800 bg-neutral-900/40"
+        }`}
+      >
+        <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-bold text-white">{meta.label}</p>
-          <p className="mt-1 text-xs text-neutral-400">{meta.description}</p>
-          {meta.shimejiHint ? (
-            <p className="mt-1 text-[11px] text-neutral-500">
-              Shimeji hint: {meta.shimejiHint}
-            </p>
-          ) : null}
+          <RequiredAnimationBadge category={category} />
         </div>
-
-        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-neutral-400">
-          Source frames (click to add/remove)
+        <p className="mt-1 text-xs leading-relaxed text-neutral-400">
+          {meta.description}
         </p>
-        <div className="grid max-h-[320px] grid-cols-5 gap-2 overflow-y-auto rounded-lg border border-neutral-800 p-2">
-          {draft.sources.map((source) => {
-            const isAssigned = assignment.frames.includes(source.path);
-            return (
-              <button
-                key={source.path}
-                type="button"
-                onClick={() => toggleFrame(category, source.path)}
-                title={source.name}
-                className={`flex aspect-square items-center justify-center rounded border p-1 ${
-                  isAssigned
-                    ? "border-white bg-white/10"
-                    : "border-neutral-800 hover:border-neutral-600"
-                }`}
-              >
-                <img
-                  src={source.url}
-                  alt={source.name}
-                  draggable={false}
-                  className="h-full w-full object-contain"
-                  style={{ imageRendering: "pixelated" }}
-                />
-              </button>
-            );
-          })}
-        </div>
+        {missingRequired ? (
+          <p className="mt-2 text-xs font-medium text-amber-300">
+            Add at least one frame — this slot is required.
+          </p>
+        ) : null}
       </div>
 
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900/60 py-2">
+      <div className="flex flex-wrap items-center gap-6 rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-4">
+        <div className="flex items-center justify-center rounded-lg border border-neutral-800 bg-neutral-950/80 p-3">
           <AnimationPreviewPlayer
             frames={previewFrames}
             fps={assignment.fps}
@@ -76,65 +82,80 @@ export function AnimationAssignmentPanel({
           />
         </div>
 
-        <label className="text-xs text-neutral-300">
-          Speed: {assignment.fps} fps
-          <input
-            type="range"
-            min={1}
-            max={24}
-            value={assignment.fps}
-            onChange={(event) => setFps(category, Number(event.target.value))}
-            className="mt-1 w-full"
-          />
-        </label>
+        {canAdjustSpeed ? (
+          <label className="min-w-[12rem] flex-1 text-xs text-neutral-300">
+            Speed: {assignment.fps} fps
+            <input
+              type="range"
+              min={1}
+              max={24}
+              value={assignment.fps}
+              onChange={(event) => setFps(category, Number(event.target.value))}
+              className="mt-2 w-full"
+            />
+          </label>
+        ) : null}
+      </div>
 
-        <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-wide text-neutral-400">
-            Order ({assignment.frames.length})
+      <div>
+        <div className="mb-3 space-y-1">
+          <p className="text-xs font-bold uppercase tracking-wide text-neutral-400">
+            Source frames
           </p>
-          <ol className="flex max-h-[180px] flex-col gap-1 overflow-y-auto">
-            {assignment.frames.map((path, index) => (
-              <li
-                key={`${path}-${index}`}
-                className="flex items-center gap-2 rounded border border-neutral-800 px-2 py-1"
+          <p className="text-xs text-neutral-500">
+            Left-click to add · right-click to remove last copy · duplicates
+            allowed
+          </p>
+        </div>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2 rounded-xl border border-neutral-800 p-3">
+          {draft.sources.map((source) => {
+            const usageCount = countFrameUsage(assignment.frames, source.path);
+
+            return (
+              <button
+                key={source.path}
+                type="button"
+                onClick={() => addFrame(category, source.path)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  removeLastFrameByPath(category, source.path);
+                }}
+                title={
+                  usageCount > 0
+                    ? `${source.name} — left-click add, right-click remove last copy (${usageCount} assigned)`
+                    : `${source.name} — left-click to add`
+                }
+                className="relative flex aspect-square items-center justify-center rounded-md border border-neutral-800 p-1 transition hover:border-neutral-500 hover:bg-neutral-900"
               >
                 <img
-                  src={urlFor(path)}
-                  alt=""
-                  className="h-7 w-7 object-contain"
+                  src={source.url}
+                  alt={source.name}
+                  draggable={false}
+                  className="h-full w-full object-contain"
                   style={{ imageRendering: "pixelated" }}
                 />
-                <span className="flex-1 text-[11px] text-neutral-400">
-                  {index + 1}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => moveFrame(category, index, -1)}
-                  className="px-1 text-neutral-400 hover:text-white"
-                  aria-label="Move up"
-                >
-                  ^
-                </button>
-                <button
-                  type="button"
-                  onClick={() => moveFrame(category, index, 1)}
-                  className="px-1 text-neutral-400 hover:text-white"
-                  aria-label="Move down"
-                >
-                  v
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removeFrame(category, index)}
-                  className="px-1 text-red-300 hover:text-red-200"
-                  aria-label="Remove"
-                >
-                  x
-                </button>
-              </li>
-            ))}
-          </ol>
+                {usageCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-black">
+                    {usageCount}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
+      </div>
+
+      <div>
+        <p className="mb-3 text-xs font-bold uppercase tracking-wide text-neutral-400">
+          Playback order ({assignment.frames.length})
+        </p>
+        <FrameOrderList
+          frames={assignment.frames}
+          urlFor={urlFor}
+          nameFor={nameFor}
+          onMove={(index, direction) => moveFrame(category, index, direction)}
+          onRemove={(index) => removeFrame(category, index)}
+        />
       </div>
     </div>
   );

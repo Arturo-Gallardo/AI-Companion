@@ -30,17 +30,23 @@ export type AnimationCategory =
   | "dangleOnBar"
   | "fall"
   | "bounce"
-  | "dragNeutral"
+  | "dragLightLeft"
   | "dragMildLeft"
   | "dragStrongLeft"
+  | "dragLightRight"
   | "dragMildRight"
   | "dragStrongRight"
   | "dragResist"
   | "grabWall"
-  | "climbWallUp"
-  | "climbWallDown"
+  | "climbWall"
   | "grabCeiling"
-  | "climbCeiling";
+  | "climbCeiling"
+  | "emote"
+  | "emote2"
+  | "emote3"
+  | "emote4"
+  | "emote5"
+  | "emote6";
 
 export const ANIMATION_CATEGORIES: readonly AnimationCategory[] = [
   "idle",
@@ -52,24 +58,50 @@ export const ANIMATION_CATEGORIES: readonly AnimationCategory[] = [
   "dangleOnBar",
   "fall",
   "bounce",
-  "dragNeutral",
+  "dragLightLeft",
   "dragMildLeft",
   "dragStrongLeft",
+  "dragLightRight",
   "dragMildRight",
   "dragStrongRight",
   "dragResist",
   "grabWall",
-  "climbWallUp",
-  "climbWallDown",
+  "climbWall",
   "grabCeiling",
   "climbCeiling",
+  "emote",
+  "emote2",
+  "emote3",
+  "emote4",
+  "emote5",
+  "emote6",
 ] as const;
 
-// only idle is strictly required; everything else falls back so a partial
-// character never crashes the engine.
+// idle + walk are required for import; everything else falls back at runtime.
 export const REQUIRED_ANIMATION_CATEGORIES: readonly AnimationCategory[] = [
   "idle",
+  "walk",
 ] as const;
+
+const REQUIRED_ANIMATION_SET = new Set<AnimationCategory>(
+  REQUIRED_ANIMATION_CATEGORIES,
+);
+
+export function isRequiredAnimationCategory(
+  category: AnimationCategory,
+): boolean {
+  return REQUIRED_ANIMATION_SET.has(category);
+}
+
+export function hasRequiredAnimationAssignments(
+  assignments: Partial<
+    Record<AnimationCategory, { frames: readonly unknown[] }>
+  >,
+): boolean {
+  return REQUIRED_ANIMATION_CATEGORIES.every(
+    (category) => (assignments[category]?.frames.length ?? 0) > 0,
+  );
+}
 
 export interface BehaviorSettings {
   // multiplier applied to the character base walk velocity

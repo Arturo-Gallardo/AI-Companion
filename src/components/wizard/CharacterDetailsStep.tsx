@@ -24,7 +24,7 @@ export function CharacterDetailsStep({ controller }: CharacterDetailsStepProps) 
   };
 
   return (
-    <div className="grid max-w-3xl grid-cols-2 gap-8">
+    <div className="grid gap-10 lg:grid-cols-2">
       <div className="space-y-5">
         <label className="block">
           <span className="text-xs font-bold uppercase tracking-wide text-neutral-400">
@@ -114,24 +114,30 @@ export function CharacterDetailsStep({ controller }: CharacterDetailsStepProps) 
             </button>
           </div>
 
-          <ul className="mt-3 flex max-h-[180px] flex-col gap-1 overflow-y-auto">
-            {draft.dialogueLines.map((line, index) => (
-              <li
-                key={`${line}-${index}`}
-                className="flex items-center justify-between rounded border border-neutral-800 px-2 py-1 text-sm text-neutral-200"
-              >
-                <span className="truncate">{line}</span>
-                <button
-                  type="button"
-                  onClick={() => removeDialogueLine(index)}
-                  className="px-1 text-red-300 hover:text-red-200"
-                  aria-label="Remove line"
+          {draft.dialogueLines.length > 0 ? (
+            <ul className="mt-4 flex flex-col gap-2">
+              {draft.dialogueLines.map((line, index) => (
+                <li
+                  key={`${line}-${index}`}
+                  className="flex items-center justify-between rounded-lg border border-neutral-800 px-3 py-2 text-sm text-neutral-200"
                 >
-                  x
-                </button>
-              </li>
-            ))}
-          </ul>
+                  <span className="truncate">{line}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeDialogueLine(index)}
+                    className="px-2 text-red-300 hover:text-red-200"
+                    aria-label="Remove line"
+                  >
+                    x
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-4 rounded-lg border border-dashed border-neutral-800 px-3 py-4 text-center text-xs text-neutral-500">
+              No dialogue lines yet.
+            </p>
+          )}
         </div>
 
         <label className="block">

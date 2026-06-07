@@ -29,6 +29,7 @@ interface UseAutonomousDialogueOptions {
   behaviorState: CompanionBehaviorState;
   behaviorStateRef: RefObject<CompanionBehaviorState>;
   startDialogue: (text: string) => void;
+  characterId: string;
   // the speaking companion's lines + how chatty it is (0..1)
   dialogueSettings?: DialogueSettings;
 }
@@ -40,15 +41,18 @@ export function useAutonomousDialogue({
   behaviorState,
   behaviorStateRef,
   startDialogue,
+  characterId,
   dialogueSettings,
 }: UseAutonomousDialogueOptions): void {
   const startDialogueRef = useRef(startDialogue);
+  const characterIdRef = useRef(characterId);
   const dialogueSettingsRef = useRef(dialogueSettings);
 
   useEffect(() => {
     startDialogueRef.current = startDialogue;
+    characterIdRef.current = characterId;
     dialogueSettingsRef.current = dialogueSettings;
-  }, [dialogueSettings, startDialogue]);
+  }, [characterId, dialogueSettings, startDialogue]);
 
   useEffect(() => {
     if (!isReady || isFrozen || !isAutonomousDialogueEligible(behaviorState)) {
@@ -77,9 +81,13 @@ export function useAutonomousDialogue({
           const chance = settings?.frequency ?? DEFAULT_AUTONOMOUS_DIALOGUE_CHANCE;
 
           if (Math.random() < chance) {
-            startDialogueRef.current(
-              pickDialogueLine(settings ?? { lines: [], frequency: chance }),
+            const line = pickDialogueLine(
+              settings ?? { lines: [], frequency: chance },
+              characterIdRef.current,
             );
+            if (line !== null) {
+              startDialogueRef.current(line);
+            }
           }
 
           scheduleNext();

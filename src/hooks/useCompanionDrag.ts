@@ -74,10 +74,10 @@ export function useCompanionDrag({
 }: UseCompanionDragOptions): UseCompanionDragResult {
   const [isDragging, setIsDragging] = useState(false);
   const [grabbedLeanTier, setGrabbedLeanTier] =
-    useState<GrabbedLeanTier>("neutral");
+    useState<GrabbedLeanTier>("lightLeft");
 
   const isDraggingRef = useRef(false);
-  const leanTierRef = useRef<GrabbedLeanTier>("neutral");
+  const leanTierRef = useRef<GrabbedLeanTier>("lightLeft");
   const smoothedVelocityRef = useRef(0);
   const dragOffsetRef = useRef<DragOffset>({ x: 0, y: 0 });
   const pointerSamplesRef = useRef<PointerSample[]>([]);
@@ -110,9 +110,9 @@ export function useCompanionDrag({
   }, []);
 
   const resetLeanState = useCallback(() => {
-    leanTierRef.current = "neutral";
+    leanTierRef.current = "lightLeft";
     smoothedVelocityRef.current = 0;
-    setGrabbedLeanTier("neutral");
+    setGrabbedLeanTier("lightLeft");
   }, []);
 
   const updateLeanFromVelocity = useCallback((rawVelocityX: number) => {

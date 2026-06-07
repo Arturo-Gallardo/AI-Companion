@@ -8,7 +8,7 @@ use std::sync::{LazyLock, Mutex};
 
 use serde::Serialize;
 use tauri::window::Color;
-use tauri::{AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 
 pub use menu::{create_companion_menu_window, hide_companion_menu, show_companion_menu};
 pub use speech::{
@@ -256,6 +256,46 @@ pub fn set_companion_position(
     Ok(())
 }
 
+fn apply_companion_window_size(
+    window: &tauri::WebviewWindow,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    let size = LogicalSize::new(width, height);
+
+    // borderless windows on windows often ignore set_size unless briefly resizable
+    #[cfg(windows)]
+    {
+        window
+            .set_resizable(true)
+            .map_err(|error| format!("failed to unlock companion resize: {error}"))?;
+        window
+            .set_size(size)
+            .map_err(|error| format!("failed to resize companion window: {error}"))?;
+        window
+            .set_resizable(false)
+            .map_err(|error| format!("failed to lock companion resize: {error}"))?;
+        return Ok(());
+    }
+
+    #[cfg(not(windows))]
+    {
+        window
+            .set_size(size)
+            .map_err(|error| format!("failed to resize companion window: {error}"))?;
+        Ok(())
+    }
+}
+
+#[tauri::command]
+pub fn set_companion_window_size(
+    window: tauri::WebviewWindow,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    apply_companion_window_size(&window, width, height)
+}
+
 // spawns (or reveals) the OS window for a single companion instance. x/y are
 // the window top-left in physical screen pixels.
 //
@@ -274,6 +314,7 @@ pub async fn create_companion_instance_window(
     let label = companion_window_label(&id);
 
     if let Some(existing) = app.get_webview_window(&label) {
+        apply_companion_window_size(&existing, width, height)?;
         existing
             .show()
             .map_err(|error| format!("failed to show companion window: {error}"))?;

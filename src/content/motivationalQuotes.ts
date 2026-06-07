@@ -16,3 +16,6 @@ export const MOTIVATIONAL_QUOTES = [
   "one focused hour today beats a lazy week. let's go.",
   "lock in.",
 ] as const;
+
+// editable copy for the built-in character's settings screen
+export const BUILTIN_DEFAULT_DIALOGUE_LINES: string[] = [...MOTIVATIONAL_QUOTES];

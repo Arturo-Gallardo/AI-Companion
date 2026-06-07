@@ -29,6 +29,13 @@ export async function setCompanionPosition(
   });
 }
 
+export async function setCompanionWindowSize(
+  width: number,
+  height: number,
+): Promise<void> {
+  await invoke("set_companion_window_size", { width, height });
+}
+
 // spawns (or reveals) the OS window for a single companion instance.
 // x/y are the window top-left in physical screen pixels.
 export async function createCompanionInstanceWindow(

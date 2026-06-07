@@ -20,7 +20,7 @@ export function useCompanionBackgroundToggle(): UseCompanionBackgroundToggleResu
   }, [mode]);
 
   const toggleLabel =
-    mode === "transparent" ? "Gray companion bg" : "Clear companion bg";
+    mode === "transparent" ? "Gray bg" : "Clear bg";
 
   return {
     mode,

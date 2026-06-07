@@ -1,39 +1,18 @@
-import type { CharacterLibraryEntry, CharacterManifest } from "../types/character";
+import { emit } from "@tauri-apps/api/event";
+import type { CharacterLibraryEntry } from "../types/character";
+import {
+  BUILTIN_CHARACTER_ID,
+  ensureBuiltinCharacterStored,
+} from "./builtinCharacter";
 import { libraryFilePath, characterDirPath } from "./fs/appPaths";
 import { pathExists, readJson, removePath, writeJson } from "./fs/fileSystemAdapter";
 
-// the original bundled sprite, expressed as a library entry. its animations are
-// resolved straight from the engine constants (see animationRegistry), so the
-// manifest only needs to advertise metadata + defaults here.
-export const BUILTIN_CHARACTER_ID = "beyond-birthday";
+export { BUILTIN_CHARACTER_ID };
+
+// broadcast when imported character manifests or sprites change on disk.
+export const CHARACTER_LIBRARY_EVENT = "character-library-changed";
 
 const LIBRARY_VERSION = 1;
-
-const BUILTIN_MANIFEST: CharacterManifest = {
-  id: BUILTIN_CHARACTER_ID,
-  name: "Beyond Birthday",
-  version: "1.0.0",
-  author: "Tomoji",
-  defaultScale: 1,
-  defaultSpeed: 2,
-  frameWidth: 128,
-  frameHeight: 128,
-  animations: {},
-  behaviorSettings: {
-    movementSpeed: 1,
-    actionFrequency: 0.5,
-    dialogueFrequency: 0.2,
-  },
-  dialogueSettings: {
-    lines: [],
-    frequency: 0.2,
-  },
-};
-
-export const BUILTIN_CHARACTER_ENTRY: CharacterLibraryEntry = {
-  manifest: BUILTIN_MANIFEST,
-  source: "builtin",
-};
 
 interface LibraryFile {
   version: number;
@@ -60,22 +39,24 @@ async function writeStoredCharacters(
 ): Promise<void> {
   const file: LibraryFile = { version: LIBRARY_VERSION, characters };
   await writeJson(await libraryFilePath(), file);
+  await emit(CHARACTER_LIBRARY_EVENT);
 }
 
-// the built-in character is always present and listed first.
+// beyond-birthday lives on disk like every other character; listed first.
 export async function listCharacters(): Promise<CharacterLibraryEntry[]> {
+  const builtin = await ensureBuiltinCharacterStored();
   const stored = await readStoredCharacters();
   const imported = stored.filter(
     (entry) => entry.manifest.id !== BUILTIN_CHARACTER_ID,
   );
-  return [BUILTIN_CHARACTER_ENTRY, ...imported];
+  return [builtin, ...imported];
 }
 
 export async function getCharacter(
   id: string,
 ): Promise<CharacterLibraryEntry | null> {
   if (id === BUILTIN_CHARACTER_ID) {
-    return BUILTIN_CHARACTER_ENTRY;
+    return ensureBuiltinCharacterStored();
   }
 
   const stored = await readStoredCharacters();
@@ -85,6 +66,10 @@ export async function getCharacter(
 export async function addCharacter(
   entry: CharacterLibraryEntry,
 ): Promise<void> {
+  if (entry.manifest.id === BUILTIN_CHARACTER_ID) {
+    return;
+  }
+
   const stored = await readStoredCharacters();
   const next = [
     ...stored.filter((existing) => existing.manifest.id !== entry.manifest.id),

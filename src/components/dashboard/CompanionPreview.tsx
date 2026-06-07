@@ -1,16 +1,26 @@
-import { useMemo } from "react";
-import { SPRITE_HEIGHT, SPRITE_WIDTH } from "../../animations/beyondBirthday";
+import { useCharacterAnimationRegistry } from "../../hooks/useCharacterAnimationRegistry";
 import { useCompanionAnimation } from "../../hooks/useCompanionAnimation";
 import { useCompanionMirrorState } from "../../hooks/useCompanionMirrorState";
-import { createBuiltinRegistry } from "../../services/animationRegistry";
+import type { AnimationRegistry } from "../../services/animationRegistry";
+import type { CompanionInstance } from "../../types/companionInstance";
 import { CompanionSprite } from "../companion/CompanionSprite";
 
 const PREVIEW_SCALE = 3;
 
-export function CompanionPreview() {
-  const mirrorState = useCompanionMirrorState();
-  // the preview mirrors the built-in default companion
-  const registry = useMemo(() => createBuiltinRegistry(), []);
+interface CompanionPreviewProps {
+  instance: CompanionInstance;
+}
+
+interface CompanionPreviewInnerProps {
+  instance: CompanionInstance;
+  registry: AnimationRegistry;
+}
+
+function CompanionPreviewInner({
+  instance,
+  registry,
+}: CompanionPreviewInnerProps) {
+  const mirrorState = useCompanionMirrorState(instance.id);
 
   const { frameSrc } = useCompanionAnimation({
     registry,
@@ -19,8 +29,8 @@ export function CompanionPreview() {
     grabbedLeanTier: mirrorState.grabbedLeanTier,
   });
 
-  const previewWidth = SPRITE_WIDTH * PREVIEW_SCALE;
-  const previewHeight = SPRITE_HEIGHT * PREVIEW_SCALE;
+  const previewWidth = registry.spriteWidth * PREVIEW_SCALE;
+  const previewHeight = registry.spriteHeight * PREVIEW_SCALE;
 
   return (
     <section className="flex h-full min-h-0 items-center justify-center">
@@ -35,8 +45,25 @@ export function CompanionPreview() {
           isDragging={mirrorState.isDragging}
           interactive={false}
           scale={PREVIEW_SCALE}
+          spriteWidth={registry.spriteWidth}
+          spriteHeight={registry.spriteHeight}
+          spriteAnchor={registry.getSpriteAnchor(mirrorState.action)}
         />
       </div>
     </section>
   );
+}
+
+export function CompanionPreview({ instance }: CompanionPreviewProps) {
+  const registry = useCharacterAnimationRegistry(instance.characterId);
+
+  if (registry === null) {
+    return (
+      <section className="flex h-full min-h-0 items-center justify-center text-sm text-neutral-500">
+        Loading preview…
+      </section>
+    );
+  }
+
+  return <CompanionPreviewInner instance={instance} registry={registry} />;
 }

@@ -7,11 +7,9 @@ import {
   createCompanionSpeechInstanceWindow,
   destroyCompanionInstanceWindow,
 } from "./companionApi";
-import {
-  BUILTIN_CHARACTER_ENTRY,
-  BUILTIN_CHARACTER_ID,
-  getCharacter,
-} from "./characterLibrary";
+import { BUILTIN_CHARACTER_ID } from "./characterLibrary";
+import { ensureBuiltinCharacterStored } from "./builtinCharacter";
+import { getCharacter } from "./characterLibrary";
 import { instancesFilePath } from "./fs/appPaths";
 import { pathExists, readJson, writeJson } from "./fs/fileSystemAdapter";
 
@@ -100,7 +98,10 @@ async function defaultSpawnAnchor(index: number): Promise<{ x: number; y: number
 }
 
 async function spawnInstanceWindow(instance: CompanionInstance): Promise<void> {
-  const character = (await getCharacter(instance.characterId)) ?? BUILTIN_CHARACTER_ENTRY;
+  const character = await getCharacter(instance.characterId);
+  if (!character) {
+    throw new Error(`character not found: ${instance.characterId}`);
+  }
   const { manifest } = character;
   const width = manifest.frameWidth * instance.scale;
   const height = manifest.frameHeight * instance.scale;
@@ -116,7 +117,10 @@ export async function addInstance(
   name?: string,
 ): Promise<CompanionInstance> {
   const instances = await readStoredInstances();
-  const character = (await getCharacter(characterId)) ?? BUILTIN_CHARACTER_ENTRY;
+  const character = await getCharacter(characterId);
+  if (!character) {
+    throw new Error(`character not found: ${characterId}`);
+  }
   const position = await defaultSpawnAnchor(instances.length);
   const instance = instanceFromCharacter(
     crypto.randomUUID(),
@@ -172,14 +176,19 @@ export async function updateInstance(
 let bootstrapInFlight: Promise<CompanionInstance[]> | null = null;
 
 async function bootstrapCompanionsInternal(): Promise<CompanionInstance[]> {
+  await ensureBuiltinCharacterStored();
   let instances = await readStoredInstances();
 
   if (instances.length === 0) {
+    const builtin = await getCharacter(BUILTIN_CHARACTER_ID);
+    if (!builtin) {
+      throw new Error("built-in character is missing from local storage");
+    }
     const position = await defaultSpawnAnchor(0);
     const seed = instanceFromCharacter(
       "default",
-      BUILTIN_CHARACTER_ENTRY.manifest.name,
-      BUILTIN_CHARACTER_ENTRY.manifest,
+      builtin.manifest.name,
+      builtin.manifest,
       position,
     );
     instances = [seed];

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 // reusable looping animation player. drives an index over the given frames at
 // the given fps and instantly reflects frame/fps changes (used by the import
@@ -9,12 +9,13 @@ export function useAnimationPreviewPlayer(
   isPlaying = true,
 ): string | null {
   const [index, setIndex] = useState(0);
-  // a stable key so effects only restart when the actual frames change
+  const indexRef = useRef(0);
   const framesKey = useMemo(() => frames.join("|"), [frames]);
 
   useEffect(() => {
+    indexRef.current = 0;
     setIndex(0);
-  }, [framesKey]);
+  }, [framesKey, frames.length]);
 
   useEffect(() => {
     if (!isPlaying || frames.length <= 1 || fps <= 0) {
@@ -22,14 +23,14 @@ export function useAnimationPreviewPlayer(
     }
 
     const intervalId = window.setInterval(() => {
-      setIndex((current) => (current + 1) % frames.length);
+      const nextIndex = (indexRef.current + 1) % frames.length;
+      indexRef.current = nextIndex;
+      setIndex(nextIndex);
     }, 1000 / fps);
 
     return () => {
       window.clearInterval(intervalId);
     };
-    // framesKey captures frame identity; length/fps drive the cadence
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [framesKey, fps, isPlaying, frames.length]);
 
   if (frames.length === 0) {

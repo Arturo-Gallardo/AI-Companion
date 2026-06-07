@@ -8,12 +8,14 @@ export function SelectImgFolderStep({ controller }: SelectImgFolderStepProps) {
   const { draft, isLoadingFolder, loadImgFolder } = controller;
 
   return (
-    <div className="space-y-5">
-      <p className="max-w-xl text-sm text-neutral-400">
+    <div className="space-y-8">
+      <p className="max-w-xl text-sm leading-relaxed text-neutral-400">
         Shimeji characters ship as a folder of PNG frames (usually called
-        <code className="mx-1 rounded bg-neutral-800 px-1">img</code>). Pick that
-        folder and we'll convert the frames you choose into a Tomoji. Your files
-        stay on your machine - nothing is uploaded or redistributed.
+        <code className="mx-1 rounded bg-neutral-800 px-1.5 py-0.5 text-neutral-200">
+          img
+        </code>
+        ). Pick that folder and we&apos;ll convert the frames you choose into a
+        Tomoji. Your files stay on your machine — nothing is uploaded.
       </p>
 
       <button
@@ -27,15 +29,15 @@ export function SelectImgFolderStep({ controller }: SelectImgFolderStepProps) {
 
       {draft.imgDir ? (
         <div>
-          <p className="mb-2 text-xs text-neutral-400">
+          <p className="mb-4 text-sm text-neutral-400">
             {draft.sources.length} frames found ({draft.frameWidth}x
             {draft.frameHeight})
           </p>
-          <div className="grid max-h-[280px] grid-cols-8 gap-2 overflow-y-auto rounded-lg border border-neutral-800 p-2">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2 rounded-xl border border-neutral-800 p-3">
             {draft.sources.map((source) => (
               <div
                 key={source.path}
-                className="flex aspect-square items-center justify-center rounded border border-neutral-800 p-1"
+                className="flex aspect-square items-center justify-center rounded-md border border-neutral-800 p-1"
                 title={source.name}
               >
                 <img

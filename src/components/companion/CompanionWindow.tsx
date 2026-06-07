@@ -9,6 +9,7 @@ import { useCompanionSitEvents } from "../../hooks/useCompanionSitEvents";
 import { useCompanionWalkPickerEvents } from "../../hooks/useCompanionWalkPickerEvents";
 import { useCompanionMirrorBroadcast } from "../../hooks/useCompanionMirrorBroadcast";
 import { useCompanionSpeechWindow } from "../../hooks/useCompanionSpeechWindow";
+import { useCompanionWindowSizeSync } from "../../hooks/useCompanionWindowSizeSync";
 import type { AnimationRegistry } from "../../services/animationRegistry";
 import type { CompanionInstance } from "../../types/companionInstance";
 import { CompanionSprite } from "./CompanionSprite";
@@ -30,6 +31,7 @@ function CompanionWindowInner({ instance, registry }: CompanionWindowInnerProps)
     showTitleBarLockHint,
     grabbedLeanTier,
     getAnchorPosition,
+    setAnchorPosition,
     onWalkTick,
     onClimbTick,
     onBounceComplete,
@@ -47,8 +49,19 @@ function CompanionWindowInner({ instance, registry }: CompanionWindowInnerProps)
     onContextMenu,
   } = useCompanionBehavior({
     registry,
+    characterId: instance.characterId,
+    scale: instance.scale,
     initialAnchor: instance.position,
     dialogueSettings: instance.dialogueSettings,
+    behaviorSettings: instance.behaviorSettings,
+  });
+
+  useCompanionWindowSizeSync({
+    instance,
+    registry,
+    isReady,
+    getAnchorPosition,
+    setAnchorPosition,
   });
 
   const backgroundMode = useCompanionBackgroundEvents();

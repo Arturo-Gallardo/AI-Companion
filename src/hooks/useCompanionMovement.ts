@@ -50,6 +50,7 @@ import { useCompanionWindowSurfaces } from "./useCompanionWindowSurfaces";
 
 interface UseCompanionMovementOptions {
   registry: AnimationRegistry;
+  scale: number;
   initialAnchor?: ScreenPosition;
   onSurfaceLockLost?: () => void;
   usesTitleBarSitAnchorRef?: RefObject<boolean>;
@@ -85,8 +86,13 @@ interface UseCompanionMovementResult {
 export function useCompanionMovement(
   options: UseCompanionMovementOptions,
 ): UseCompanionMovementResult {
-  const { registry, initialAnchor, onSurfaceLockLost, usesTitleBarSitAnchorRef } =
-    options;
+  const {
+    registry,
+    scale,
+    initialAnchor,
+    onSurfaceLockLost,
+    usesTitleBarSitAnchorRef,
+  } = options;
   const onSurfaceLockLostRef = useRef(onSurfaceLockLost);
 
   useEffect(() => {
@@ -112,13 +118,13 @@ export function useCompanionMovement(
   const getAnchorYOffset = useCallback((): number => {
     const lock = surfaceLockRef.current;
     if (lock && isUndersideLock(lock.kind)) {
-      return registry.getSpriteAnchor("grabCeiling").y;
+      return registry.getSpriteAnchor("grabCeiling").y * scale;
     }
 
-    return registry.getSpriteAnchor("idle").y;
-  }, [registry]);
+    return registry.getSpriteAnchor("idle").y * scale;
+  }, [registry, scale]);
 
-  const anchorXOffset = registry.spriteWidth / 2;
+  const anchorXOffset = (registry.spriteWidth / 2) * scale;
 
   useEffect(() => {
     desktopBoundsRef.current = desktopBounds;

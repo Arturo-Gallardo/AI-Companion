@@ -33,10 +33,14 @@ import { joinPath, toAssetUrl } from "./fs/fileSystemAdapter";
 const FALLBACK_FRAME =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
+// shimeji = built-in index patterns (walk cycle, etc.); sequential = 1→2→…→1
+export type AnimationPlaybackStyle = "shimeji" | "sequential";
+
 // resolves a runtime animation + sprite geometry for whichever character a
 // companion instance uses. the built-in character is served straight from the
 // engine constants so its physics/animation stay byte-for-byte identical.
 export interface AnimationRegistry {
+  playbackStyle: AnimationPlaybackStyle;
   spriteWidth: number;
   spriteHeight: number;
   getAnimation: (action: CompanionAction) => RuntimeAnimation;
@@ -52,6 +56,7 @@ export interface AnimationRegistry {
 
 export function createBuiltinRegistry(): AnimationRegistry {
   return {
+    playbackStyle: "shimeji",
     spriteWidth: SPRITE_WIDTH,
     spriteHeight: SPRITE_HEIGHT,
     getAnimation: (action) => {
@@ -90,19 +95,20 @@ const ACTION_TO_CATEGORY: Record<CompanionAction, AnimationCategory> = {
   dangleOnBar: "dangleOnBar",
   fall: "fall",
   bounce: "bounce",
-  grabbed: "dragNeutral",
+  grabbed: "dragLightLeft",
   resist: "dragResist",
   grabWall: "grabWall",
-  climbWall: "climbWallUp",
-  climbWallDown: "climbWallDown",
+  climbWall: "climbWall",
+  climbWallDown: "climbWall",
   grabCeiling: "grabCeiling",
   climbCeiling: "climbCeiling",
 };
 
 const LEAN_TIER_TO_CATEGORY: Record<GrabbedLeanTier, AnimationCategory> = {
-  neutral: "dragNeutral",
+  lightLeft: "dragLightLeft",
   mildLeft: "dragMildLeft",
   strongLeft: "dragStrongLeft",
+  lightRight: "dragLightRight",
   mildRight: "dragMildRight",
   strongRight: "dragStrongRight",
 };
@@ -111,7 +117,8 @@ const LEAN_TIER_TO_CATEGORY: Record<GrabbedLeanTier, AnimationCategory> = {
 const LEGACY_CATEGORY_FALLBACKS: Partial<
   Record<AnimationCategory, readonly string[]>
 > = {
-  dragNeutral: ["dragNeutral", "drag"],
+  dragLightLeft: ["dragLightLeft", "dragNeutral", "drag"],
+  dragLightRight: ["dragLightRight", "dragNeutral", "drag"],
   dragMildLeft: ["dragMildLeft", "drag"],
   dragStrongLeft: ["dragStrongLeft", "drag"],
   dragMildRight: ["dragMildRight", "drag"],
@@ -120,14 +127,14 @@ const LEGACY_CATEGORY_FALLBACKS: Partial<
   fall: ["fall", "thrown"],
   bounce: ["bounce", "thrown"],
   grabWall: ["grabWall", "climb"],
-  climbWallUp: ["climbWallUp", "climb"],
-  climbWallDown: ["climbWallDown", "climb"],
+  climbWall: ["climbWall", "climbWallUp", "climbWallDown", "climb"],
   grabCeiling: ["grabCeiling", "climb"],
   climbCeiling: ["climbCeiling", "climb"],
   sitAlt: ["sitAlt", "sit"],
   sitAlt2: ["sitAlt2", "sit"],
   sitOnBar: ["sitOnBar", "sit"],
   dangleOnBar: ["dangleOnBar", "sit"],
+  emote: ["emote", "emotes"],
 };
 
 type LegacyAnimationCategory = (typeof LEGACY_ANIMATION_CATEGORIES)[number];
@@ -234,20 +241,6 @@ function resolveCategoryDefinition(
   return undefined;
 }
 
-function reverseFrames(frames: string[]): string[] {
-  return [...frames].reverse();
-}
-
-function reverseTickDurations(
-  durations: number[] | undefined,
-  frameCount: number,
-): number[] | undefined {
-  if (!durations || durations.length !== frameCount) {
-    return durations;
-  }
-  return [...durations].reverse();
-}
-
 async function buildImportedRegistry(
   manifest: CharacterManifest,
 ): Promise<AnimationRegistry> {
@@ -294,32 +287,6 @@ async function buildImportedRegistry(
 
   const getAnimation = (action: CompanionAction): RuntimeAnimation => {
     const category = ACTION_TO_CATEGORY[action];
-
-    if (action === "climbWallDown") {
-      const down = categoryData.get("climbWallDown");
-      if (down && down.frames.length > 0) {
-        return {
-          frames: down.frames,
-          tickDuration: down.tickDuration,
-          frameTickDurations: down.frameTickDurations,
-          velocity: actionVelocity(action, speed),
-        };
-      }
-
-      const up = categoryData.get("climbWallUp");
-      if (up && up.frames.length > 0) {
-        return {
-          frames: reverseFrames(up.frames),
-          tickDuration: up.tickDuration,
-          frameTickDurations: reverseTickDurations(
-            up.frameTickDurations,
-            up.frames.length,
-          ),
-          velocity: actionVelocity(action, speed),
-        };
-      }
-    }
-
     const data = categoryData.get(category);
     const resolvedFrames = framesForCategory(category);
 
@@ -370,15 +337,21 @@ async function buildImportedRegistry(
       return direct;
     }
 
-    const neutral = firstFrame("dragNeutral");
-    if (neutral) {
-      return neutral;
+    const lightLeft = firstFrame("dragLightLeft");
+    if (lightLeft) {
+      return lightLeft;
+    }
+
+    const lightRight = firstFrame("dragLightRight");
+    if (lightRight) {
+      return lightRight;
     }
 
     return framesForCategory("idle")[0] ?? FALLBACK_FRAME;
   };
 
   return {
+    playbackStyle: "sequential",
     spriteWidth: width,
     spriteHeight: height,
     getAnimation,

@@ -38,8 +38,9 @@ export type FacingDirection = "left" | "right";
 
 // velocity-based lean tier while the pet is being dragged
 export type GrabbedLeanTier =
-  | "neutral"
+  | "lightLeft"
   | "mildLeft"
   | "strongLeft"
+  | "lightRight"
   | "mildRight"
   | "strongRight";

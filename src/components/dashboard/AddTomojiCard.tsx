@@ -7,7 +7,7 @@ export function AddTomojiCard({ onAdd }: AddTomojiCardProps) {
     <button
       type="button"
       onClick={onAdd}
-      className="relative h-36 w-36 rounded-2xl border border-white bg-neutral-950 hover:bg-neutral-900"
+      className="relative aspect-square w-full max-w-[11rem] rounded-2xl border border-dashed border-neutral-600 bg-neutral-950 transition hover:border-white hover:bg-neutral-900"
       aria-label="Add Tomoji"
     >
       <span

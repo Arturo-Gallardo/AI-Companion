@@ -1,5 +1,6 @@
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { listenOnThisWebview } from "./companionInstanceContext";
 import type {
   TargetPickerMode,
   TargetPickerOpenPayload,
@@ -34,15 +35,18 @@ export async function cancelWalkPicker(targetLabel: string): Promise<void> {
 export async function listenTargetPickerOpen(
   handler: (payload: TargetPickerOpenPayload) => void,
 ): Promise<UnlistenFn> {
-  return listen<TargetPickerOpenPayload>(TARGET_PICKER_OPEN_EVENT, (event) => {
-    handler(event.payload);
-  });
+  return listenOnThisWebview<TargetPickerOpenPayload>(
+    TARGET_PICKER_OPEN_EVENT,
+    (event) => {
+      handler(event.payload);
+    },
+  );
 }
 
 export async function listenTargetPickerSelected(
   handler: (payload: TargetPickerSelectedPayload) => void,
 ): Promise<UnlistenFn> {
-  return listen<TargetPickerSelectedPayload>(
+  return listenOnThisWebview<TargetPickerSelectedPayload>(
     WALK_PICKER_SELECTED_EVENT,
     (event) => {
       handler(event.payload);
@@ -53,7 +57,7 @@ export async function listenTargetPickerSelected(
 export async function listenWalkPickerCancel(
   handler: () => void,
 ): Promise<UnlistenFn> {
-  return listen(WALK_PICKER_CANCEL_EVENT, () => {
+  return listenOnThisWebview(WALK_PICKER_CANCEL_EVENT, () => {
     handler();
   });
 }

@@ -1,7 +1,9 @@
 mod companion;
+mod data_folder;
 mod main_window;
 mod tray;
 
+use data_folder::open_characters_folder;
 use companion::{
     cancel_walk_picker, create_companion_instance_window, create_companion_menu_window,
     create_companion_speech_instance_window, create_walk_picker_window,
@@ -9,6 +11,7 @@ use companion::{
     get_work_area, get_window_surfaces, hide_companion_menu, hide_companion_speech,
     hide_walk_picker, hit_title_bar_at, hit_window_bottom_at, hit_window_wall_at,
     register_excluded_hwnds_from_app, set_companion_position, set_companion_speech_size,
+    set_companion_window_size,
     show_companion_menu, show_companion_speech, show_walk_picker, submit_target_picker,
     take_companion_speech_content,
 };
@@ -41,6 +44,7 @@ pub fn run() {
             hit_window_wall_at,
             hit_window_bottom_at,
             set_companion_position,
+            set_companion_window_size,
             create_companion_instance_window,
             create_companion_speech_instance_window,
             destroy_companion_instance_window,
@@ -54,6 +58,7 @@ pub fn run() {
             hide_walk_picker,
             submit_target_picker,
             cancel_walk_picker,
+            open_characters_folder,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   listShimejiFrames,
+  loadCharacterDraft,
   pickShimejiImgFolder,
 } from "../services/shimejiImporter";
-import { buildShimejiPresetAssignments } from "../constants/shimejiFramePresets";
 import { ANIMATION_CATEGORIES } from "../types/character";
 import type { AnimationCategory, BehaviorSettings } from "../types/character";
 import type {
@@ -61,6 +61,49 @@ export function useShimejiDraft() {
     [draft.assignments, urlFor],
   );
 
+  const loadFromCharacter = useCallback(async (characterId: string) => {
+    setIsLoadingFolder(true);
+    try {
+      const next = await loadCharacterDraft(characterId);
+      setDraft(next);
+    } finally {
+      setIsLoadingFolder(false);
+    }
+  }, []);
+
+  // merges new pngs into the picker without clearing assignments
+  const mergeImgFolder = useCallback(async () => {
+    const dir = await pickShimejiImgFolder();
+    if (dir === null) {
+      return;
+    }
+
+    setIsLoadingFolder(true);
+    try {
+      const incoming = await listShimejiFrames(dir);
+      setDraft((current) => {
+        const known = new Set(current.sources.map((source) => source.path));
+        const merged = [...current.sources];
+
+        for (const source of incoming) {
+          if (known.has(source.path)) {
+            continue;
+          }
+          merged.push(source);
+          known.add(source.path);
+        }
+
+        merged.sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { numeric: true }),
+        );
+
+        return { ...current, sources: merged };
+      });
+    } finally {
+      setIsLoadingFolder(false);
+    }
+  }, []);
+
   const loadImgFolder = useCallback(async () => {
     const dir = await pickShimejiImgFolder();
     if (dir === null) {
@@ -83,23 +126,11 @@ export function useShimejiDraft() {
         }
       }
 
-      const presets = buildShimejiPresetAssignments(sources);
-      const assignments = emptyAssignments();
-      for (const category of ANIMATION_CATEGORIES) {
-        const preset = presets[category];
-        if (preset) {
-          assignments[category] = {
-            frames: preset.frames,
-            fps: preset.fps,
-          };
-        }
-      }
-
       setDraft((current) => ({
         ...current,
         imgDir: dir,
         sources,
-        assignments,
+        assignments: emptyAssignments(),
         frameWidth,
         frameHeight,
       }));
@@ -108,20 +139,19 @@ export function useShimejiDraft() {
     }
   }, []);
 
-  const toggleFrame = useCallback(
+  const addFrame = useCallback(
     (category: AnimationCategory, path: string) => {
       setDraft((current) => {
         const assignment = current.assignments[category];
-        const exists = assignment.frames.includes(path);
-        const frames = exists
-          ? assignment.frames.filter((frame) => frame !== path)
-          : [...assignment.frames, path];
 
         return {
           ...current,
           assignments: {
             ...current.assignments,
-            [category]: { ...assignment, frames },
+            [category]: {
+              ...assignment,
+              frames: [...assignment.frames, path],
+            },
           },
         };
       });
@@ -134,6 +164,29 @@ export function useShimejiDraft() {
       setDraft((current) => {
         const assignment = current.assignments[category];
         const frames = assignment.frames.filter((_, i) => i !== index);
+        return {
+          ...current,
+          assignments: {
+            ...current.assignments,
+            [category]: { ...assignment, frames },
+          },
+        };
+      });
+    },
+    [],
+  );
+
+  // removes the last copy of a source frame — pairs with left-click add
+  const removeLastFrameByPath = useCallback(
+    (category: AnimationCategory, path: string) => {
+      setDraft((current) => {
+        const assignment = current.assignments[category];
+        const lastIndex = assignment.frames.lastIndexOf(path);
+        if (lastIndex === -1) {
+          return current;
+        }
+
+        const frames = assignment.frames.filter((_, index) => index !== lastIndex);
         return {
           ...current,
           assignments: {
@@ -226,9 +279,12 @@ export function useShimejiDraft() {
     isLoadingFolder,
     urlFor,
     framesUrls,
+    loadFromCharacter,
+    mergeImgFolder,
     loadImgFolder,
-    toggleFrame,
+    addFrame,
     removeFrame,
+    removeLastFrameByPath,
     moveFrame,
     setFps,
     setName,

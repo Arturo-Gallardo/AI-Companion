@@ -92,7 +92,7 @@ export function validateManifestShape(data: unknown): ValidationResult {
       const legacyDefinition = animations[legacy];
       if (legacyDefinition !== undefined) {
         warnings.push(
-          `legacy animation bucket "${legacy}" found — import wizard now uses finer categories (dragNeutral, bounce, climbWallUp, etc.)`,
+          `legacy animation bucket "${legacy}" found — import wizard now uses finer categories (dragLightLeft, bounce, climbWallUp, etc.)`,
         );
         if (!isAnimationDefinition(legacyDefinition)) {
           errors.push(`legacy animation "${legacy}" is malformed`);

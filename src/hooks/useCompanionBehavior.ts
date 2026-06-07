@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { showCompanionMenu } from "../services/companionMenuApi";
 import type { AnimationRegistry } from "../services/animationRegistry";
-import type { DialogueSettings } from "../types/character";
+import type { DialogueSettings, BehaviorSettings } from "../types/character";
+import { normalizeBehaviorSettings } from "../services/behaviorSettings";
 import type {
   CompanionAction,
   FacingDirection,
@@ -9,6 +10,7 @@ import type {
 } from "../animations/types";
 import { LANDING_THRESHOLD, resolveDisplayAction, usesTitleBarSitAnchor } from "../animations/beyondBirthday";
 import {
+  type AnchorClampMode,
   type CompanionBehaviorState,
   type FallVelocity,
   type ScreenPosition,
@@ -44,8 +46,10 @@ function randomBetween(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
-function randomIdleDelay(): number {
-  return randomBetween(MIN_IDLE_MS, MAX_IDLE_MS);
+function randomIdleDelay(actionFrequency: number): number {
+  const urgency = Math.max(actionFrequency, 0.05);
+  const scale = 1 / urgency;
+  return randomBetween(MIN_IDLE_MS * scale, MAX_IDLE_MS * scale);
 }
 
 interface UseCompanionBehaviorResult {
@@ -59,6 +63,10 @@ interface UseCompanionBehaviorResult {
   wallSide: WindowWallSide | null;
   grabbedLeanTier: GrabbedLeanTier;
   getAnchorPosition: () => ScreenPosition;
+  setAnchorPosition: (
+    position: ScreenPosition,
+    mode?: AnchorClampMode,
+  ) => Promise<void>;
   onWalkTick: (deltaX: number) => void;
   onClimbTick: (deltaY: number) => void;
   onBounceComplete: () => void;
@@ -79,15 +87,28 @@ interface UseCompanionBehaviorResult {
 
 interface UseCompanionBehaviorOptions {
   registry: AnimationRegistry;
+  characterId: string;
+  scale: number;
   initialAnchor?: ScreenPosition;
   dialogueSettings?: DialogueSettings;
+  behaviorSettings?: BehaviorSettings;
 }
 
 export function useCompanionBehavior({
   registry,
+  characterId,
+  scale,
   initialAnchor,
   dialogueSettings,
+  behaviorSettings,
 }: UseCompanionBehaviorOptions): UseCompanionBehaviorResult {
+  const behaviorSettingsRef = useRef(
+    normalizeBehaviorSettings(behaviorSettings),
+  );
+
+  useEffect(() => {
+    behaviorSettingsRef.current = normalizeBehaviorSettings(behaviorSettings);
+  }, [behaviorSettings]);
   const handleSurfaceLockLostRef = useRef<() => void>(() => {});
   const usesTitleBarSitAnchorRef = useRef(false);
 
@@ -113,6 +134,7 @@ export function useCompanionBehavior({
     tryLockSurfaceAt,
   } = useCompanionMovement({
     registry,
+    scale,
     initialAnchor,
     onSurfaceLockLost: () => {
       handleSurfaceLockLostRef.current();
@@ -749,17 +771,20 @@ export function useCompanionBehavior({
       behaviorState !== "idle" ||
       isWallLocked ||
       isUndersideLocked ||
-      isFrozen
+      isFrozen ||
+      behaviorSettingsRef.current.actionFrequency <= 0
     ) {
       return;
     }
+
+    const actionFrequency = behaviorSettingsRef.current.actionFrequency;
 
     const timeoutId = window.setTimeout(() => {
       if (behaviorStateRef.current !== "idle" || isFrozenRef.current) {
         return;
       }
 
-      if (Math.random() < AUTONOMOUS_SIT_CHANCE) {
+      if (Math.random() < AUTONOMOUS_SIT_CHANCE * actionFrequency) {
         startSitting("auto");
         return;
       }
@@ -770,12 +795,13 @@ export function useCompanionBehavior({
       }
 
       startWalkingTo(target);
-    }, randomIdleDelay());
+    }, randomIdleDelay(actionFrequency));
 
     return () => {
       window.clearTimeout(timeoutId);
     };
   }, [
+    behaviorSettings,
     behaviorState,
     isFrozen,
     isReady,
@@ -788,9 +814,17 @@ export function useCompanionBehavior({
 
   // window bottom crawl — horizontal autonomous moves
   useEffect(() => {
-    if (!isReady || behaviorState !== "idle" || !isUndersideLocked || isFrozen) {
+    if (
+      !isReady ||
+      behaviorState !== "idle" ||
+      !isUndersideLocked ||
+      isFrozen ||
+      behaviorSettingsRef.current.actionFrequency <= 0
+    ) {
       return;
     }
+
+    const actionFrequency = behaviorSettingsRef.current.actionFrequency;
 
     const timeoutId = window.setTimeout(() => {
       if (
@@ -807,12 +841,13 @@ export function useCompanionBehavior({
       }
 
       startCrawlingTo(target);
-    }, randomIdleDelay());
+    }, randomIdleDelay(actionFrequency));
 
     return () => {
       window.clearTimeout(timeoutId);
     };
   }, [
+    behaviorSettings,
     behaviorState,
     isFrozen,
     isReady,
@@ -823,9 +858,17 @@ export function useCompanionBehavior({
 
   // on a window wall, sometimes climb up or down
   useEffect(() => {
-    if (!isReady || behaviorState !== "idle" || !isWallLocked || isFrozen) {
+    if (
+      !isReady ||
+      behaviorState !== "idle" ||
+      !isWallLocked ||
+      isFrozen ||
+      behaviorSettingsRef.current.actionFrequency <= 0
+    ) {
       return;
     }
+
+    const actionFrequency = behaviorSettingsRef.current.actionFrequency;
 
     const timeoutId = window.setTimeout(() => {
       if (behaviorStateRef.current !== "idle" || isFrozenRef.current) {
@@ -849,12 +892,13 @@ export function useCompanionBehavior({
       }
 
       startClimbingTo(nextTarget);
-    }, randomIdleDelay());
+    }, randomIdleDelay(actionFrequency));
 
     return () => {
       window.clearTimeout(timeoutId);
     };
   }, [
+    behaviorSettings,
     behaviorState,
     getVerticalClimbRange,
     isFrozen,
@@ -899,6 +943,7 @@ export function useCompanionBehavior({
     behaviorState,
     behaviorStateRef,
     startDialogue,
+    characterId,
     dialogueSettings,
   });
 
@@ -949,10 +994,12 @@ export function useCompanionBehavior({
         return;
       }
 
+      const adjustedDelta =
+        deltaY * behaviorSettingsRef.current.movementSpeed;
       const currentY = anchorYRef.current;
       const targetY = targetYRef.current;
-      const nextY = currentY + deltaY;
-      const climbingUp = deltaY < 0;
+      const nextY = currentY + adjustedDelta;
+      const climbingUp = adjustedDelta < 0;
       const reachedTarget =
         (climbingUp && nextY <= targetY) ||
         (!climbingUp && nextY >= targetY);
@@ -962,7 +1009,7 @@ export function useCompanionBehavior({
         return;
       }
 
-      const moved = moveByY(deltaY);
+      const moved = moveByY(adjustedDelta);
       if (!moved) {
         void finishClimbing(currentY);
       }
@@ -976,9 +1023,11 @@ export function useCompanionBehavior({
         return;
       }
 
+      const adjustedDelta =
+        deltaX * behaviorSettingsRef.current.movementSpeed;
       const currentX = anchorXRef.current;
       const targetX = targetXRef.current;
-      const nextX = currentX + deltaX;
+      const nextX = currentX + adjustedDelta;
       const reachedTarget =
         (facing === "right" && nextX >= targetX) ||
         (facing === "left" && nextX <= targetX);
@@ -988,7 +1037,7 @@ export function useCompanionBehavior({
         return;
       }
 
-      const moved = moveBy(deltaX);
+      const moved = moveBy(adjustedDelta);
       if (!moved) {
         void tryFinishWalkAtWall(clampAnchorX(currentX));
       }
@@ -1046,6 +1095,7 @@ export function useCompanionBehavior({
     wallSide,
     grabbedLeanTier,
     getAnchorPosition,
+    setAnchorPosition,
     onWalkTick,
     onClimbTick,
     onBounceComplete,
