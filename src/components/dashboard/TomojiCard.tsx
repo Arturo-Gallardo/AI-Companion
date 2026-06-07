@@ -170,7 +170,7 @@ export function TomojiCard({
       </div>
 
       <p className="w-full truncate text-center text-sm font-bold text-white">
-        {isBuiltin ? instance.name : instance.characterId}
+        {instance.characterId}
       </p>
 
       {isMenuOpen ? (

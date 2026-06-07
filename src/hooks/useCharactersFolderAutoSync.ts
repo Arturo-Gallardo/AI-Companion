@@ -5,6 +5,7 @@ import { reconcileTomojiRegistry } from "../services/companionInstanceManager";
 
 const POLL_MS = 8000;
 const DEBOUNCE_MS = 1000;
+const COPY_SETTLE_MS = 750;
 
 // picks up folders copied into <appData>/characters without heavy constant resync
 export function useCharactersFolderAutoSync(): void {
@@ -34,8 +35,21 @@ export function useCharactersFolderAutoSync(): void {
           return;
         }
 
+        await new Promise((resolve) => {
+          setTimeout(resolve, COPY_SETTLE_MS);
+        });
+        if (cancelled) {
+          return;
+        }
+
+        const settledFingerprint = await getCharactersFolderFingerprint();
+        if (settledFingerprint !== fingerprint) {
+          scheduleSync();
+          return;
+        }
+
         await reconcileTomojiRegistry({ spawnNew: true });
-        fingerprintRef.current = await getCharactersFolderFingerprint();
+        fingerprintRef.current = settledFingerprint;
       } catch (error) {
         console.error("characters folder auto-sync failed", error);
       } finally {
@@ -56,18 +70,28 @@ export function useCharactersFolderAutoSync(): void {
 
     void (async () => {
       fingerprintRef.current = await getCharactersFolderFingerprint();
+      if (cancelled) {
+        return;
+      }
 
       pollTimer = setInterval(() => {
         scheduleSync();
       }, POLL_MS);
 
-      unlistenFocus = await getCurrentWindow().onFocusChanged(
+      const stopListening = await getCurrentWindow().onFocusChanged(
         ({ payload: focused }) => {
           if (focused) {
             scheduleSync();
           }
         },
       );
+      if (cancelled) {
+        stopListening();
+        clearInterval(pollTimer);
+        pollTimer = undefined;
+        return;
+      }
+      unlistenFocus = stopListening;
     })();
 
     return () => {

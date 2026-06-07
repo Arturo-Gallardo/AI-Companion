@@ -4,6 +4,27 @@ import type { WindowSurface } from "../types/companion";
 
 const SURFACE_POLL_MS = 200;
 
+function surfacesMatch(
+  current: WindowSurface[],
+  next: WindowSurface[],
+): boolean {
+  return (
+    current.length === next.length &&
+    current.every((surface, index) => {
+      const candidate = next[index];
+      return (
+        candidate !== undefined &&
+        surface.hwnd === candidate.hwnd &&
+        surface.left === candidate.left &&
+        surface.right === candidate.right &&
+        surface.top === candidate.top &&
+        surface.bottom === candidate.bottom &&
+        surface.titleBarBottom === candidate.titleBarBottom
+      );
+    })
+  );
+}
+
 interface UseCompanionWindowSurfacesResult {
   surfaces: WindowSurface[];
   surfacesRef: RefObject<WindowSurface[]>;
@@ -31,7 +52,9 @@ export function useCompanionWindowSurfaces(
         const nextSurfaces = await getWindowSurfaces();
         if (!cancelled) {
           surfacesRef.current = nextSurfaces;
-          setSurfaces(nextSurfaces);
+          setSurfaces((current) =>
+            surfacesMatch(current, nextSurfaces) ? current : nextSurfaces,
+          );
         }
       } catch {
         // polling failed — keep last snapshot

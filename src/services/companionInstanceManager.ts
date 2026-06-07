@@ -80,6 +80,7 @@ async function ensureBuiltinInstancePresent(): Promise<CompanionInstance[]> {
     builtin.manifest.name,
     builtin.manifest,
     position,
+    true,
   );
   instances = [...instances, seed];
   await writeStoredInstances(instances);
@@ -114,8 +115,10 @@ function resolveLibraryEntry(
 // disk folders are source of truth — drop orphan/duplicate cards, fix stale ids
 async function repairCompanionRegistry(
   instances: CompanionInstance[],
-  spawnNew: boolean,
-): Promise<CompanionInstance[]> {
+): Promise<{
+  instances: CompanionInstance[];
+  newlyAdded: CompanionInstance[];
+}> {
   const characters = await listCharacters();
   const imported = characters.filter(
     (entry) => !isBuiltinCharacterId(entry.manifest.id),
@@ -189,6 +192,7 @@ async function repairCompanionRegistry(
       character.manifest.id,
       character.manifest,
       await defaultSpawnAnchor(next.length),
+      false,
     );
     next.push(instance);
     newlyAdded.push(instance);
@@ -200,29 +204,24 @@ async function repairCompanionRegistry(
     await writeStoredInstances(next);
   }
 
-  if (spawnNew) {
-    for (const instance of newlyAdded) {
-      if (instance.enabled && !instance.archived) {
-        try {
-          await spawnInstanceWindow(instance);
-        } catch (error) {
-          console.error("failed to spawn companion for imported folder", error);
-        }
-      }
-    }
-  }
-
-  return changed ? next : instances;
+  return {
+    instances: changed ? next : instances,
+    newlyAdded,
+  };
 }
 
-let reconcileInFlight: Promise<CompanionInstance[]> | null = null;
+let reconcileInFlight: Promise<{
+  instances: CompanionInstance[];
+  newlyAdded: CompanionInstance[];
+}> | null = null;
 
-async function reconcileTomojiRegistryInternal(
-  spawnNew: boolean,
-): Promise<CompanionInstance[]> {
+async function reconcileTomojiRegistryInternal(): Promise<{
+  instances: CompanionInstance[];
+  newlyAdded: CompanionInstance[];
+}> {
   await syncCharactersFromDisk();
   const instances = await ensureBuiltinInstancePresent();
-  return repairCompanionRegistry(instances, spawnNew);
+  return repairCompanionRegistry(instances);
 }
 
 // full disk sync + instance repair. deduped — safe to call from poll/refresh.
@@ -232,12 +231,27 @@ export async function reconcileTomojiRegistry(options?: {
   const spawnNew = options?.spawnNew ?? false;
 
   if (!reconcileInFlight) {
-    reconcileInFlight = reconcileTomojiRegistryInternal(spawnNew).finally(() => {
+    reconcileInFlight = reconcileTomojiRegistryInternal().finally(() => {
       reconcileInFlight = null;
     });
   }
 
-  return reconcileInFlight;
+  const result = await reconcileInFlight;
+  if (spawnNew) {
+    for (const instance of result.newlyAdded) {
+      if (!instance.enabled || instance.archived) {
+        continue;
+      }
+
+      try {
+        await spawnInstanceWindow(instance);
+      } catch (error) {
+        console.error("failed to spawn companion for imported folder", error);
+      }
+    }
+  }
+
+  return result.instances;
 }
 
 export async function readCompanionInstances(): Promise<CompanionInstance[]> {
@@ -261,6 +275,7 @@ function instanceFromCharacter(
   name: string,
   manifest: CharacterManifest,
   position: { x: number; y: number },
+  enabled: boolean,
 ): CompanionInstance {
   return {
     id,
@@ -269,7 +284,7 @@ function instanceFromCharacter(
     position,
     velocity: { x: 0, y: 0 },
     scale: manifest.defaultScale,
-    enabled: true,
+    enabled,
     currentAnimation: "idle",
     behaviorState: "idle",
     behaviorSettings: { ...manifest.behaviorSettings },
@@ -324,6 +339,7 @@ export async function addInstance(
     name ?? character.manifest.id,
     character.manifest,
     position,
+    false,
   );
 
   await writeStoredInstances([...instances, instance]);

@@ -113,7 +113,9 @@ export function useCompanionMovement(
   const lockedSurfaceSnapshotRef = useRef<LockedSurfaceSnapshot | null>(null);
   const lockedSurfaceCacheRef = useRef<WindowSurface | null>(null);
 
-  const { surfaces, surfacesRef } = useCompanionWindowSurfaces(isReady);
+  const { surfaces, surfacesRef } = useCompanionWindowSurfaces(
+    isReady && surfaceLock !== null,
+  );
 
   const getAnchorYOffset = useCallback((): number => {
     const lock = surfaceLockRef.current;

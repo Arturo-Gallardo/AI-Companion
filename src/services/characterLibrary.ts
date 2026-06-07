@@ -30,7 +30,10 @@ import {
   removePath,
   writeJson,
 } from "./fs/fileSystemAdapter";
-import { validateManifestShape } from "./manifestValidator";
+import {
+  validateManifestAssets,
+  validateManifestShape,
+} from "./manifestValidator";
 
 const COMPANION_REGISTRY_EVENT = "companion-registry-changed";
 
@@ -47,7 +50,7 @@ const LIBRARY_VERSION = 1;
 
 interface InstancesFile {
   version: number;
-  instances: { characterId: string }[];
+  instances: { characterId: string; name?: string }[];
 }
 
 let folderMigrationDone = false;
@@ -351,12 +354,27 @@ export async function syncCharactersFromDisk(): Promise<CharacterSyncResult> {
   const storedById = new Map(
     stored.map((entry) => [entry.manifest.id, entry]),
   );
+  const storedByPath = new Map(
+    stored
+      .filter((entry) => entry.folderPath !== undefined)
+      .map((entry) => [entry.folderPath as string, entry]),
+  );
   const entries = await listDirectory(charactersRoot);
 
   let added = 0;
   let updated = 0;
   let skipped = 0;
   const next: CharacterLibraryEntry[] = [];
+  const retainedIds = new Set<string>();
+
+  const preserveExisting = (existing: CharacterLibraryEntry | undefined) => {
+    if (existing === undefined || retainedIds.has(existing.manifest.id)) {
+      return;
+    }
+
+    next.push(existing);
+    retainedIds.add(existing.manifest.id);
+  };
 
   for (const entry of entries) {
     if (!entry.isDirectory) {
@@ -367,10 +385,13 @@ export async function syncCharactersFromDisk(): Promise<CharacterSyncResult> {
     if (isBuiltinCharacterId(folderName)) {
       continue;
     }
+    const existing =
+      storedById.get(folderName) ?? storedByPath.get(entry.path);
 
     const manifestPath = await joinPath(entry.path, "manifest.json");
     if (!(await pathExists(manifestPath))) {
       skipped += 1;
+      preserveExisting(existing);
       continue;
     }
 
@@ -379,12 +400,14 @@ export async function syncCharactersFromDisk(): Promise<CharacterSyncResult> {
       parsed = await readJson<unknown>(manifestPath);
     } catch {
       skipped += 1;
+      preserveExisting(existing);
       continue;
     }
 
     const shape = validateManifestShape(parsed);
     if (!shape.valid) {
       skipped += 1;
+      preserveExisting(existing);
       continue;
     }
 
@@ -398,19 +421,27 @@ export async function syncCharactersFromDisk(): Promise<CharacterSyncResult> {
       await writeJson(manifestPath, manifest);
     }
 
-    const existing =
-      storedById.get(folderName) ??
-      stored.find((candidate) => candidate.folderPath === folderPath);
+    const assets = await validateManifestAssets(manifest, folderPath);
+    if (!assets.valid) {
+      skipped += 1;
+      preserveExisting(existing);
+      continue;
+    }
+
     const libraryEntry: CharacterLibraryEntry = {
       manifest,
       source: inferCharacterSource(manifest, existing),
       folderPath,
     };
+    const manifestContentChanged =
+      existing !== undefined &&
+      JSON.stringify(existing.manifest) !== JSON.stringify(manifest);
 
     if (existing === undefined) {
       added += 1;
     } else if (
       manifestChanged ||
+      manifestContentChanged ||
       existing.folderPath !== folderPath ||
       existing.manifest.name !== manifest.name
     ) {
@@ -418,6 +449,7 @@ export async function syncCharactersFromDisk(): Promise<CharacterSyncResult> {
     }
 
     next.push(libraryEntry);
+    retainedIds.add(manifest.id);
   }
 
   const storedIds = stored
@@ -433,6 +465,8 @@ export async function syncCharactersFromDisk(): Promise<CharacterSyncResult> {
 
   if (libraryChanged) {
     await writeStoredCharacters(next);
+  } else {
+    await emit(CHARACTER_LIBRARY_EVENT);
   }
 
   return { added, updated, skipped };

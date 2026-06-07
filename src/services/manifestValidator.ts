@@ -116,22 +116,33 @@ export async function validateManifestAssets(
   manifest: CharacterManifest,
   baseDir: string,
 ): Promise<ValidationResult> {
-  const errors: string[] = [];
   const warnings: string[] = [];
+  const checkedPaths = new Set<string>();
+  const checks: Promise<string | null>[] = [];
 
-  const entries = Object.entries(manifest.animations) as [
+  for (const [category, definition] of Object.entries(manifest.animations) as [
     AnimationCategory,
     AnimationDefinition,
-  ][];
-
-  for (const [category, definition] of entries) {
+  ][]) {
     for (const frame of definition.frames) {
-      const fullPath = await joinPath(baseDir, frame.src);
-      if (!(await pathExists(fullPath))) {
-        errors.push(`animation "${category}" references missing file ${frame.src}`);
+      if (checkedPaths.has(frame.src)) {
+        continue;
       }
+      checkedPaths.add(frame.src);
+
+      checks.push(
+        (async () => {
+          const fullPath = await joinPath(baseDir, frame.src);
+          return (await pathExists(fullPath))
+            ? null
+            : `animation "${category}" references missing file ${frame.src}`;
+        })(),
+      );
     }
   }
 
+  const errors = (await Promise.all(checks)).filter(
+    (error): error is string => error !== null,
+  );
   return { valid: errors.length === 0, errors, warnings };
 }

@@ -21,9 +21,7 @@ export function CharacterSettingsEditor({
   onSave,
 }: CharacterSettingsEditorProps) {
   const isBuiltin = isBuiltinCharacterId(instance.characterId);
-  const [name, setName] = useState(
-    isBuiltin ? instance.name : instance.characterId,
-  );
+  const [name, setName] = useState(instance.characterId);
   const [scale, setScale] = useState(instance.scale);
   const [behavior, setBehavior] = useState(instance.behaviorSettings);
   const [dialogue, setDialogue] = useState(instance.dialogueSettings);
@@ -93,20 +91,20 @@ export function CharacterSettingsEditor({
         <div className="space-y-6">
           <label className="block">
             <span className="text-xs font-bold uppercase tracking-wide text-neutral-400">
-              {isBuiltin ? "Name" : "Folder name"}
+              Folder name
             </span>
             <input
               type="text"
               value={name}
               onChange={(event) => setName(event.target.value)}
+              disabled={isBuiltin}
               className="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-sm text-white outline-none focus:border-white"
             />
-            {isBuiltin ? null : (
-              <p className="mt-2 text-xs text-neutral-500">
-                Matches the Tomoji folder on disk. Saving renames the folder
-                (for example, Gojo becomes gojo-tomoji).
-              </p>
-            )}
+            <p className="mt-2 text-xs text-neutral-500">
+              {isBuiltin
+                ? "Built-in folder name stays fixed so bundled updates keep working."
+                : "Matches the Tomoji folder on disk. Saving renames the folder (for example, Gojo becomes gojo)."}
+            </p>
           </label>
 
           <label className="block">

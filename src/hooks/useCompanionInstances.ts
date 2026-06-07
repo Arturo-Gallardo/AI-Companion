@@ -38,29 +38,37 @@ export function useCompanionInstances(): UseCompanionInstancesResult {
   const [instances, setInstances] = useState<CompanionInstance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const refresh = useCallback(async () => {
-    setInstances(await readCompanionInstances());
-  }, []);
-
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let cancelled = false;
+    const refresh = async () => {
+      const next = await readCompanionInstances();
+      if (!cancelled) {
+        setInstances(next);
+      }
+    };
 
     void (async () => {
+      const stopListening = await listen(COMPANION_REGISTRY_EVENT, () => {
+        void refresh();
+      });
+      if (cancelled) {
+        stopListening();
+        return;
+      }
+      unlisten = stopListening;
+
       await refresh();
       if (!cancelled) {
         setIsLoading(false);
       }
-      unlisten = await listen(COMPANION_REGISTRY_EVENT, () => {
-        void refresh();
-      });
     })();
 
     return () => {
       cancelled = true;
       unlisten?.();
     };
-  }, [refresh]);
+  }, []);
 
   const addCompanion = useCallback(
     async (characterId: string, name?: string) => {

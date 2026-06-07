@@ -7,6 +7,7 @@ import {
   readDir,
   readFile,
   readTextFile,
+  rename,
   remove,
   writeFile,
   writeTextFile,
@@ -91,9 +92,18 @@ export async function readJson<T>(path: string): Promise<T> {
 }
 
 export async function writeJson(path: string, data: unknown): Promise<void> {
-  // make sure the target directory exists (first run has no appData folder yet)
   await ensureDir(await dirname(path));
-  await writeTextFile(path, JSON.stringify(data, null, 2));
+  const tempPath = `${path}.${crypto.randomUUID()}.tmp`;
+
+  try {
+    await writeTextFile(tempPath, JSON.stringify(data, null, 2));
+    await rename(tempPath, path);
+  } catch (error) {
+    if (await exists(tempPath)) {
+      await remove(tempPath);
+    }
+    throw error;
+  }
 }
 
 export async function readBinary(path: string): Promise<Uint8Array> {
