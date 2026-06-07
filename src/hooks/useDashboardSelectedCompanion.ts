@@ -47,7 +47,8 @@ export function useDashboardSelectedCompanion(): UseDashboardSelectedCompanionRe
   );
 
   const controllableInstances = useMemo(
-    () => instances.filter((instance) => instance.enabled),
+    () =>
+      instances.filter((instance) => instance.enabled && !instance.archived),
     [instances],
   );
 

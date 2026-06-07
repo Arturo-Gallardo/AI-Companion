@@ -117,6 +117,34 @@ export async function copyFile(
   await writeFile(destPath, bytes);
 }
 
+async function copyDirectory(source: string, dest: string): Promise<void> {
+  await ensureDir(dest);
+  const entries = await listDirectory(source);
+
+  for (const entry of entries) {
+    const destEntry = await joinPath(dest, entry.name);
+    if (entry.isDirectory) {
+      await copyDirectory(entry.path, destEntry);
+      continue;
+    }
+
+    await copyFile(entry.path, destEntry);
+  }
+}
+
+export async function movePath(source: string, dest: string): Promise<void> {
+  if (!(await pathExists(source))) {
+    return;
+  }
+
+  if (await pathExists(dest)) {
+    throw new Error(`destination already exists: ${dest}`);
+  }
+
+  await copyDirectory(source, dest);
+  await removePath(source);
+}
+
 export async function listDirectory(path: string): Promise<DirectoryEntry[]> {
   const entries = await readDir(path);
   const resolved: DirectoryEntry[] = [];

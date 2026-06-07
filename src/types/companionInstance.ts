@@ -18,6 +18,8 @@ export interface CompanionInstance {
   velocity: CompanionVelocity;
   scale: number;
   enabled: boolean;
+  // hidden from main tomojis grid; companion window stays closed
+  archived?: boolean;
   currentAnimation: CompanionAction;
   behaviorState: CompanionBehaviorState;
   behaviorSettings: BehaviorSettings;

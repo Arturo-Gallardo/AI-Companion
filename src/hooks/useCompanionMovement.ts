@@ -423,12 +423,10 @@ export function useCompanionMovement(
       // prefer the instance's saved anchor; fall back to the default corner
       const startPosition = initialAnchor ?? getRightmostMonitorFloorStart(bounds);
 
-      anchorRef.current = startPosition;
-      setAnchorXState(startPosition.x);
-      setAnchorYState(startPosition.y);
-      setIsReady(true);
-
-      await setCompanionPosition(startPosition);
+      await applyAnchorPosition(startPosition, "grounded");
+      if (!cancelled) {
+        setIsReady(true);
+      }
     }
 
     void initPosition();
@@ -436,7 +434,7 @@ export function useCompanionMovement(
     return () => {
       cancelled = true;
     };
-  }, [initialAnchor]);
+  }, [applyAnchorPosition, initialAnchor]);
 
   const getAnchorPosition = useCallback((): ScreenPosition => {
     return anchorRef.current;

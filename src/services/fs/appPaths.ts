@@ -4,9 +4,10 @@ import { getAppDataDir, joinPath } from "./fileSystemAdapter";
 // agree on where things live:
 //   <appData>/library.json
 //   <appData>/instances.json
+//   <appData>/settings.json
 //   <appData>/characters/beyond-birthday/manifest.json  (bundled pet, seeded on first run)
-//   <appData>/characters/<id>/manifest.json
-//   <appData>/characters/<id>/sprites/<category>/*.png
+//   <appData>/characters/<folder-name>/manifest.json
+//   <appData>/characters/<folder-name>/sprites/<category>/*.png
 
 export async function libraryFilePath(): Promise<string> {
   return joinPath(await getAppDataDir(), "library.json");
@@ -14,6 +15,10 @@ export async function libraryFilePath(): Promise<string> {
 
 export async function instancesFilePath(): Promise<string> {
   return joinPath(await getAppDataDir(), "instances.json");
+}
+
+export async function settingsFilePath(): Promise<string> {
+  return joinPath(await getAppDataDir(), "settings.json");
 }
 
 export async function charactersDirPath(): Promise<string> {

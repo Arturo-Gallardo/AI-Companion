@@ -4,7 +4,6 @@ import {
   buildAnimationRegistry,
   type AnimationRegistry,
 } from "../services/animationRegistry";
-import { ensureBuiltinCharacterStored } from "../services/builtinCharacter";
 import {
   CHARACTER_LIBRARY_EVENT,
   getCharacter,
@@ -38,9 +37,14 @@ export function useCompanionInstanceConfig(): CompanionInstanceConfig | null {
       return;
     }
 
-    const character =
-      (await getCharacter(instance.characterId)) ??
-      (await ensureBuiltinCharacterStored());
+    const character = await getCharacter(instance.characterId);
+    if (!character) {
+      if (!cancelled()) {
+        setConfig(null);
+      }
+      return;
+    }
+
     const registry = await buildAnimationRegistry(character);
 
     if (!cancelled()) {

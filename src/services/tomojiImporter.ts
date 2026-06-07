@@ -1,5 +1,5 @@
 import type { CharacterManifest } from "../types/character";
-import { addCharacter } from "./characterLibrary";
+import { addCharacter, allocateNewTomojiFolderName } from "./characterLibrary";
 import { characterDirPath, characterManifestPath } from "./fs/appPaths";
 import {
   copyFile,
@@ -91,16 +91,22 @@ export async function importTomojiFromFolder(): Promise<TomojiImportResult | nul
     return { ok: false, errors: combined.errors, warnings: combined.warnings };
   }
 
-  const destDir = await characterDirPath(manifest.id);
+  const id = await allocateNewTomojiFolderName(manifest.name);
+  const storedManifest: CharacterManifest = { ...manifest, id, name: id };
+  const destDir = await characterDirPath(id);
   await ensureDir(destDir);
-  await copyManifestAssets(manifest, sourceDir, destDir);
-  await writeJson(await characterManifestPath(manifest.id), manifest);
+  await copyManifestAssets(storedManifest, sourceDir, destDir);
+  await writeJson(await characterManifestPath(id), storedManifest);
 
-  await addCharacter({ manifest, source: "tomoji", folderPath: destDir });
+  await addCharacter({
+    manifest: storedManifest,
+    source: "tomoji",
+    folderPath: destDir,
+  });
 
   return {
     ok: true,
-    characterId: manifest.id,
+    characterId: id,
     errors: [],
     warnings: combined.warnings,
   };

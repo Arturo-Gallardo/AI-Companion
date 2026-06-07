@@ -1,3 +1,4 @@
+import { isBuiltinCharacterId } from "../../services/characterLibrary";
 import type { CompanionInstance } from "../../types/companionInstance";
 
 interface DashboardCompanionSwitcherProps {
@@ -38,7 +39,9 @@ export function DashboardCompanionSwitcher({
                   : "bg-neutral-900 text-neutral-300 hover:bg-neutral-800 hover:text-white"
               }`}
             >
-              {instance.name}
+              {isBuiltinCharacterId(instance.characterId)
+                ? instance.name
+                : instance.characterId}
             </button>
           );
         })}

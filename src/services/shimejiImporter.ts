@@ -5,11 +5,7 @@ import {
   type CharacterManifest,
 } from "../types/character";
 import type { ShimejiDraft, ShimejiSourceFrame } from "../types/shimejiDraft";
-import {
-  BUILTIN_CHARACTER_ID,
-  addCharacter,
-  getCharacter,
-} from "./characterLibrary";
+import { addCharacter, getCharacter, allocateNewTomojiFolderName } from "./characterLibrary";
 import {
   characterDirPath,
   characterManifestPath,
@@ -138,10 +134,6 @@ async function writeDraftSprites(
 export async function loadCharacterDraft(
   characterId: string,
 ): Promise<ShimejiDraft> {
-  if (characterId === BUILTIN_CHARACTER_ID) {
-    throw new Error("built-in character frames cannot be edited");
-  }
-
   const entry = await getCharacter(characterId);
   if (entry === null) {
     throw new Error("character not found");
@@ -195,10 +187,6 @@ export async function saveCharacterDraft(
   characterId: string,
   draft: ShimejiDraft,
 ): Promise<void> {
-  if (characterId === BUILTIN_CHARACTER_ID) {
-    throw new Error("built-in character frames cannot be edited");
-  }
-
   const entry = await getCharacter(characterId);
   if (entry === null) {
     throw new Error("character not found");
@@ -223,14 +211,15 @@ export async function saveCharacterDraft(
 export async function convertShimejiDraft(
   draft: ShimejiDraft,
 ): Promise<string> {
-  const id = crypto.randomUUID();
+  const name = draft.name.trim() || "Imported Shimeji";
+  const id = await allocateNewTomojiFolderName(name);
   const destDir = await characterDirPath(id);
   await ensureDir(destDir);
   await writeDraftSprites(id, draft);
 
   const manifest: CharacterManifest = {
     id,
-    name: draft.name.trim() || "Imported Shimeji",
+    name: id,
     version: "1.0.0",
     author: "Imported (Shimeji)",
     defaultScale: draft.scale,

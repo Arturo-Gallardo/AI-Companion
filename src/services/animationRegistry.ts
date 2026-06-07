@@ -4,10 +4,6 @@ import {
   TICK_INTERVAL_MS,
   TITLE_BAR_SIT_ANCHOR,
   UNDERSIDE_GRAB_ANCHOR,
-  getAnimationForAction,
-  getFramePath,
-  getGrabbedFrameFromLeanTier,
-  getSpriteAnchorForAction,
   resolveDisplayAction,
 } from "../animations/beyondBirthday";
 import type {
@@ -21,11 +17,11 @@ import {
   ANIMATION_CATEGORIES,
   type AnimationCategory,
   type AnimationDefinition,
+  type AnimationPlaybackStyle,
   type CharacterLibraryEntry,
   type CharacterManifest,
 } from "../types/character";
 import type { SurfaceLock } from "../types/companion";
-import { BUILTIN_CHARACTER_ID } from "./characterLibrary";
 import { characterDirPath } from "./fs/appPaths";
 import { joinPath, toAssetUrl } from "./fs/fileSystemAdapter";
 
@@ -33,12 +29,10 @@ import { joinPath, toAssetUrl } from "./fs/fileSystemAdapter";
 const FALLBACK_FRAME =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
-// shimeji = built-in index patterns (walk cycle, etc.); sequential = 1→2→…→1
-export type AnimationPlaybackStyle = "shimeji" | "sequential";
+export type { AnimationPlaybackStyle };
 
 // resolves a runtime animation + sprite geometry for whichever character a
-// companion instance uses. the built-in character is served straight from the
-// engine constants so its physics/animation stay byte-for-byte identical.
+// companion instance uses.
 export interface AnimationRegistry {
   playbackStyle: AnimationPlaybackStyle;
   spriteWidth: number;
@@ -52,26 +46,6 @@ export interface AnimationRegistry {
   getGrabbedLeanFrame: (tier: GrabbedLeanTier) => string;
   // picks a floor sit variant among assigned sit / sitAlt / sitAlt2 slots
   pickFloorSitAction: () => CompanionAction;
-}
-
-export function createBuiltinRegistry(): AnimationRegistry {
-  return {
-    playbackStyle: "shimeji",
-    spriteWidth: SPRITE_WIDTH,
-    spriteHeight: SPRITE_HEIGHT,
-    getAnimation: (action) => {
-      const definition = getAnimationForAction(action);
-      return {
-        ...definition,
-        frames: definition.frames.map(getFramePath),
-      };
-    },
-    getSpriteAnchor: getSpriteAnchorForAction,
-    resolveDisplayAction,
-    getGrabbedLeanFrame: (tier) =>
-      getFramePath(getGrabbedFrameFromLeanTier(tier)),
-    pickFloorSitAction: () => "sit",
-  };
 }
 
 const FLOOR_SIT_ACTIONS: readonly CompanionAction[] = [
@@ -289,12 +263,13 @@ async function buildImportedRegistry(
     const category = ACTION_TO_CATEGORY[action];
     const data = categoryData.get(category);
     const resolvedFrames = framesForCategory(category);
+    const definition = resolveCategoryDefinition(manifest, category);
 
     return {
       frames: resolvedFrames,
       tickDuration: data?.tickDuration ?? 6,
       frameTickDurations: data?.frameTickDurations,
-      velocity: actionVelocity(action, speed),
+      velocity: definition?.velocity ?? actionVelocity(action, speed),
     };
   };
 
@@ -351,7 +326,7 @@ async function buildImportedRegistry(
   };
 
   return {
-    playbackStyle: "sequential",
+    playbackStyle: manifest.playbackStyle ?? "sequential",
     spriteWidth: width,
     spriteHeight: height,
     getAnimation,
@@ -365,9 +340,5 @@ async function buildImportedRegistry(
 export async function buildAnimationRegistry(
   entry: CharacterLibraryEntry,
 ): Promise<AnimationRegistry> {
-  if (entry.source === "builtin" || entry.manifest.id === BUILTIN_CHARACTER_ID) {
-    return createBuiltinRegistry();
-  }
-
   return buildImportedRegistry(entry.manifest);
 }

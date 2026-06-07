@@ -118,6 +118,8 @@ export interface DialogueSettings {
   frequency: number;
 }
 
+export type AnimationPlaybackStyle = "shimeji" | "sequential";
+
 export interface CharacterManifest {
   id: string;
   name: string;
@@ -131,6 +133,10 @@ export interface CharacterManifest {
   animations: Partial<Record<AnimationCategory, AnimationDefinition>>;
   behaviorSettings: BehaviorSettings;
   dialogueSettings: DialogueSettings;
+  // shimeji = classic walk/climb index cycle; sequential = 1→2→… loop
+  playbackStyle?: AnimationPlaybackStyle;
+  // bumped when the on-disk layout changes so older installs can migrate
+  storageVersion?: number;
 }
 
 export type CharacterSource = "builtin" | "tomoji" | "shimeji";

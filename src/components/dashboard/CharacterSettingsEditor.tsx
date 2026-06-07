@@ -1,26 +1,8 @@
 import { useState } from "react";
-import { BUILTIN_DEFAULT_DIALOGUE_LINES } from "../../content/motivationalQuotes";
-import { BUILTIN_CHARACTER_ID } from "../../services/characterLibrary";
+import { isBuiltinCharacterId } from "../../services/characterLibrary";
 import { TomojiPageHeader } from "./TomojiPageHeader";
 import { TomojiPageLayout } from "./TomojiPageLayout";
-import type { DialogueSettings } from "../../types/character";
 import type { CompanionInstance } from "../../types/companionInstance";
-
-function initialDialogueSettings(instance: CompanionInstance): DialogueSettings {
-  const settings = instance.dialogueSettings;
-
-  if (
-    instance.characterId === BUILTIN_CHARACTER_ID &&
-    settings.lines.length === 0
-  ) {
-    return {
-      ...settings,
-      lines: [...BUILTIN_DEFAULT_DIALOGUE_LINES],
-    };
-  }
-
-  return settings;
-}
 
 interface CharacterSettingsEditorProps {
   instance: CompanionInstance;
@@ -38,14 +20,16 @@ export function CharacterSettingsEditor({
   onEditFrames,
   onSave,
 }: CharacterSettingsEditorProps) {
-  const [name, setName] = useState(instance.name);
+  const isBuiltin = isBuiltinCharacterId(instance.characterId);
+  const [name, setName] = useState(
+    isBuiltin ? instance.name : instance.characterId,
+  );
   const [scale, setScale] = useState(instance.scale);
   const [behavior, setBehavior] = useState(instance.behaviorSettings);
-  const [dialogue, setDialogue] = useState(() => initialDialogueSettings(instance));
+  const [dialogue, setDialogue] = useState(instance.dialogueSettings);
   const [lineDraft, setLineDraft] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const isBuiltinCharacter = instance.characterId === BUILTIN_CHARACTER_ID;
-  const canEditFrames = !isBuiltinCharacter && onEditFrames !== undefined;
+  const canEditFrames = onEditFrames !== undefined;
 
   const addLine = () => {
     const trimmed = lineDraft.trim();
@@ -109,7 +93,7 @@ export function CharacterSettingsEditor({
         <div className="space-y-6">
           <label className="block">
             <span className="text-xs font-bold uppercase tracking-wide text-neutral-400">
-              Name
+              {isBuiltin ? "Name" : "Folder name"}
             </span>
             <input
               type="text"
@@ -117,6 +101,12 @@ export function CharacterSettingsEditor({
               onChange={(event) => setName(event.target.value)}
               className="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-sm text-white outline-none focus:border-white"
             />
+            {isBuiltin ? null : (
+              <p className="mt-2 text-xs text-neutral-500">
+                Matches the Tomoji folder on disk. Saving renames the folder
+                (for example, Gojo becomes gojo-tomoji).
+              </p>
+            )}
           </label>
 
           <label className="block">
@@ -199,12 +189,6 @@ export function CharacterSettingsEditor({
             <span className="text-xs font-bold uppercase tracking-wide text-neutral-400">
               Dialogue lines
             </span>
-            {isBuiltinCharacter ? (
-              <p className="mt-2 text-xs leading-relaxed text-neutral-500">
-                Beyond Birthday&apos;s built-in motivational lines. Edit, remove,
-                or add your own — save to apply to this Tomoji.
-              </p>
-            ) : null}
             <div className="mt-2 flex gap-2">
               <input
                 type="text"

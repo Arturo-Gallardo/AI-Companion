@@ -3,10 +3,7 @@ import {
   buildAnimationRegistry,
   type AnimationRegistry,
 } from "../services/animationRegistry";
-import {
-  getCharacter,
-} from "../services/characterLibrary";
-import { ensureBuiltinCharacterStored } from "../services/builtinCharacter";
+import { getCharacter } from "../services/characterLibrary";
 
 // loads the animation registry for a character id (dashboard preview, etc.)
 export function useCharacterAnimationRegistry(
@@ -23,9 +20,14 @@ export function useCharacterAnimationRegistry(
     let cancelled = false;
 
     void (async () => {
-      const character =
-        (await getCharacter(characterId)) ??
-        (await ensureBuiltinCharacterStored());
+      const character = await getCharacter(characterId);
+      if (character === null) {
+        if (!cancelled) {
+          setRegistry(null);
+        }
+        return;
+      }
+
       const next = await buildAnimationRegistry(character);
 
       if (!cancelled) {

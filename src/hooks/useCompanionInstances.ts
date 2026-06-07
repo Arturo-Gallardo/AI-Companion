@@ -3,15 +3,21 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   COMPANION_REGISTRY_EVENT,
   addInstance,
-  listInstances,
+  archiveInstance,
+  readCompanionInstances,
+  reconcileTomojiRegistry,
   removeInstance,
+  reorderActiveInstances,
   setInstanceEnabled,
+  unarchiveInstance,
   updateInstance,
 } from "../services/companionInstanceManager";
 import type { CompanionInstance } from "../types/companionInstance";
 
 interface UseCompanionInstancesResult {
   instances: CompanionInstance[];
+  activeInstances: CompanionInstance[];
+  archivedInstances: CompanionInstance[];
   isLoading: boolean;
   addCompanion: (characterId: string, name?: string) => Promise<void>;
   removeCompanion: (id: string) => Promise<void>;
@@ -20,6 +26,10 @@ interface UseCompanionInstancesResult {
     id: string,
     patch: Partial<Omit<CompanionInstance, "id">>,
   ) => Promise<void>;
+  archiveCompanion: (id: string) => Promise<void>;
+  unarchiveCompanion: (id: string) => Promise<void>;
+  reorderCompanions: (orderedActiveIds: string[]) => Promise<void>;
+  refreshFromDisk: () => Promise<void>;
 }
 
 // dashboard-facing view of the companion registry. stays in sync with the
@@ -29,7 +39,7 @@ export function useCompanionInstances(): UseCompanionInstancesResult {
   const [isLoading, setIsLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    setInstances(await listInstances());
+    setInstances(await readCompanionInstances());
   }, []);
 
   useEffect(() => {
@@ -74,21 +84,59 @@ export function useCompanionInstances(): UseCompanionInstancesResult {
     [],
   );
 
+  const archiveCompanion = useCallback(async (id: string) => {
+    await archiveInstance(id);
+  }, []);
+
+  const unarchiveCompanion = useCallback(async (id: string) => {
+    await unarchiveInstance(id);
+  }, []);
+
+  const reorderCompanions = useCallback(async (orderedActiveIds: string[]) => {
+    await reorderActiveInstances(orderedActiveIds);
+  }, []);
+
+  const refreshFromDisk = useCallback(async () => {
+    await reconcileTomojiRegistry({ spawnNew: true });
+  }, []);
+
+  const activeInstances = useMemo(
+    () => instances.filter((instance) => !instance.archived),
+    [instances],
+  );
+
+  const archivedInstances = useMemo(
+    () => instances.filter((instance) => instance.archived),
+    [instances],
+  );
+
   return useMemo(
     () => ({
       instances,
+      activeInstances,
+      archivedInstances,
       isLoading,
       addCompanion,
       removeCompanion,
       toggleCompanion,
       updateCompanion,
+      archiveCompanion,
+      unarchiveCompanion,
+      reorderCompanions,
+      refreshFromDisk,
     }),
     [
+      activeInstances,
       addCompanion,
+      archiveCompanion,
+      archivedInstances,
       instances,
       isLoading,
       removeCompanion,
+      reorderCompanions,
+      refreshFromDisk,
       toggleCompanion,
+      unarchiveCompanion,
       updateCompanion,
     ],
   );

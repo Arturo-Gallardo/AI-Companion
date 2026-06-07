@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useCharactersFolderAutoSync } from "../../hooks/useCharactersFolderAutoSync";
 import { useDashboardTab } from "../../hooks/useDashboardTab";
 import { useCompanionBackgroundToggle } from "../../hooks/useCompanionBackgroundToggle";
 import { useDashboardSelectedCompanion } from "../../hooks/useDashboardSelectedCompanion";
@@ -21,6 +22,8 @@ export function DashboardShell() {
     setSelectedInstanceId,
     isLoading: isSelectionLoading,
   } = useDashboardSelectedCompanion();
+
+  useCharactersFolderAutoSync();
 
   // spawn windows for enabled companions once when the dashboard opens
   useEffect(() => {

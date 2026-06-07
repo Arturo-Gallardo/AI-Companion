@@ -8,6 +8,7 @@ interface UseCompanionBackgroundToggleResult {
   cycleMode: () => void;
 }
 
+// debug-only dashboard toggle; not persisted and not exposed in settings
 export function useCompanionBackgroundToggle(): UseCompanionBackgroundToggleResult {
   const [mode, setMode] = useState<CompanionBackgroundMode>("transparent");
 
@@ -19,8 +20,7 @@ export function useCompanionBackgroundToggle(): UseCompanionBackgroundToggleResu
     void emitCompanionBackgroundMode(nextMode);
   }, [mode]);
 
-  const toggleLabel =
-    mode === "transparent" ? "Gray bg" : "Clear bg";
+  const toggleLabel = mode === "transparent" ? "Gray bg" : "Clear bg";
 
   return {
     mode,

@@ -7,9 +7,19 @@ import {
   createCompanionSpeechInstanceWindow,
   destroyCompanionInstanceWindow,
 } from "./companionApi";
-import { BUILTIN_CHARACTER_ID } from "./characterLibrary";
+import type { CharacterLibraryEntry } from "../types/character";
+import { normalizeToTomojiFolderId } from "./characterFolderName";
+import {
+  BUILTIN_CHARACTER_ID,
+  getCharacter,
+  isBuiltinCharacterId,
+  listCharacters,
+  removeCharacter,
+  renameTomojiCharacter,
+  syncCharactersFromDisk,
+} from "./characterLibrary";
 import { ensureBuiltinCharacterStored } from "./builtinCharacter";
-import { getCharacter } from "./characterLibrary";
+import { getAppSettings } from "./appSettings";
 import { instancesFilePath } from "./fs/appPaths";
 import { pathExists, readJson, writeJson } from "./fs/fileSystemAdapter";
 
@@ -48,8 +58,195 @@ async function writeStoredInstances(
   await emit(COMPANION_REGISTRY_EVENT);
 }
 
-export async function listInstances(): Promise<CompanionInstance[]> {
+async function ensureBuiltinInstancePresent(): Promise<CompanionInstance[]> {
+  await ensureBuiltinCharacterStored();
+  let instances = await readStoredInstances();
+  const hasBuiltin = instances.some((instance) =>
+    isBuiltinCharacterId(instance.characterId),
+  );
+
+  if (hasBuiltin) {
+    return instances;
+  }
+
+  const builtin = await getCharacter(BUILTIN_CHARACTER_ID);
+  if (!builtin) {
+    throw new Error("built-in character is missing from local storage");
+  }
+
+  const position = await defaultSpawnAnchor(instances.length);
+  const seed = instanceFromCharacter(
+    "default",
+    builtin.manifest.name,
+    builtin.manifest,
+    position,
+  );
+  instances = [...instances, seed];
+  await writeStoredInstances(instances);
+  return instances;
+}
+
+function resolveLibraryEntry(
+  instance: CompanionInstance,
+  characterById: Map<string, CharacterLibraryEntry>,
+): CharacterLibraryEntry | null {
+  const direct = characterById.get(instance.characterId);
+  if (direct !== undefined) {
+    return direct;
+  }
+
+  const byStoredName = characterById.get(instance.name);
+  if (byStoredName !== undefined) {
+    return byStoredName;
+  }
+
+  for (const candidate of [instance.characterId, instance.name]) {
+    const normalized = normalizeToTomojiFolderId(candidate);
+    const match = characterById.get(normalized);
+    if (match !== undefined) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+// disk folders are source of truth — drop orphan/duplicate cards, fix stale ids
+async function repairCompanionRegistry(
+  instances: CompanionInstance[],
+  spawnNew: boolean,
+): Promise<CompanionInstance[]> {
+  const characters = await listCharacters();
+  const imported = characters.filter(
+    (entry) => !isBuiltinCharacterId(entry.manifest.id),
+  );
+  const characterById = new Map(
+    imported.map((entry) => [entry.manifest.id, entry]),
+  );
+
+  let changed = false;
+  const next: CompanionInstance[] = [];
+  const seenFolders = new Set<string>();
+  const newlyAdded: CompanionInstance[] = [];
+
+  for (const instance of instances) {
+    if (isBuiltinCharacterId(instance.characterId)) {
+      if (seenFolders.has(BUILTIN_CHARACTER_ID)) {
+        changed = true;
+        if (instance.enabled) {
+          await destroyCompanionInstanceWindow(instance.id);
+        }
+        continue;
+      }
+
+      seenFolders.add(BUILTIN_CHARACTER_ID);
+      next.push(instance);
+      continue;
+    }
+
+    const entry = resolveLibraryEntry(instance, characterById);
+    if (entry === null) {
+      changed = true;
+      if (instance.enabled) {
+        await destroyCompanionInstanceWindow(instance.id);
+      }
+      continue;
+    }
+
+    const folderName = entry.manifest.id;
+    if (seenFolders.has(folderName)) {
+      changed = true;
+      if (instance.enabled) {
+        await destroyCompanionInstanceWindow(instance.id);
+      }
+      continue;
+    }
+
+    seenFolders.add(folderName);
+    const repaired: CompanionInstance = {
+      ...instance,
+      characterId: folderName,
+      name: folderName,
+    };
+
+    if (
+      repaired.characterId !== instance.characterId ||
+      repaired.name !== instance.name
+    ) {
+      changed = true;
+    }
+
+    next.push(repaired);
+  }
+
+  for (const character of imported) {
+    if (seenFolders.has(character.manifest.id)) {
+      continue;
+    }
+
+    const instance = instanceFromCharacter(
+      crypto.randomUUID(),
+      character.manifest.id,
+      character.manifest,
+      await defaultSpawnAnchor(next.length),
+    );
+    next.push(instance);
+    newlyAdded.push(instance);
+    seenFolders.add(character.manifest.id);
+    changed = true;
+  }
+
+  if (changed) {
+    await writeStoredInstances(next);
+  }
+
+  if (spawnNew) {
+    for (const instance of newlyAdded) {
+      if (instance.enabled && !instance.archived) {
+        try {
+          await spawnInstanceWindow(instance);
+        } catch (error) {
+          console.error("failed to spawn companion for imported folder", error);
+        }
+      }
+    }
+  }
+
+  return changed ? next : instances;
+}
+
+let reconcileInFlight: Promise<CompanionInstance[]> | null = null;
+
+async function reconcileTomojiRegistryInternal(
+  spawnNew: boolean,
+): Promise<CompanionInstance[]> {
+  await syncCharactersFromDisk();
+  const instances = await ensureBuiltinInstancePresent();
+  return repairCompanionRegistry(instances, spawnNew);
+}
+
+// full disk sync + instance repair. deduped — safe to call from poll/refresh.
+export async function reconcileTomojiRegistry(options?: {
+  spawnNew?: boolean;
+}): Promise<CompanionInstance[]> {
+  const spawnNew = options?.spawnNew ?? false;
+
+  if (!reconcileInFlight) {
+    reconcileInFlight = reconcileTomojiRegistryInternal(spawnNew).finally(() => {
+      reconcileInFlight = null;
+    });
+  }
+
+  return reconcileInFlight;
+}
+
+export async function readCompanionInstances(): Promise<CompanionInstance[]> {
+  await ensureBuiltinInstancePresent();
   return readStoredInstances();
+}
+
+export async function listInstances(): Promise<CompanionInstance[]> {
+  return readCompanionInstances();
 }
 
 export async function getInstance(
@@ -124,7 +321,7 @@ export async function addInstance(
   const position = await defaultSpawnAnchor(instances.length);
   const instance = instanceFromCharacter(
     crypto.randomUUID(),
-    name ?? `${character.manifest.name} ${instances.length + 1}`,
+    name ?? character.manifest.id,
     character.manifest,
     position,
   );
@@ -136,8 +333,23 @@ export async function addInstance(
 
 export async function removeInstance(id: string): Promise<void> {
   const instances = await readStoredInstances();
-  await writeStoredInstances(instances.filter((instance) => instance.id !== id));
+  const target = instances.find((instance) => instance.id === id);
+  if (target !== undefined && isBuiltinCharacterId(target.characterId)) {
+    return;
+  }
+
+  const characterId = target?.characterId;
+  const remaining = instances.filter((instance) => instance.id !== id);
+  await writeStoredInstances(remaining);
   await destroyCompanionInstanceWindow(id);
+
+  if (
+    characterId !== undefined &&
+    !isBuiltinCharacterId(characterId) &&
+    !remaining.some((instance) => instance.characterId === characterId)
+  ) {
+    await removeCharacter(characterId);
+  }
 }
 
 export async function setInstanceEnabled(
@@ -151,7 +363,7 @@ export async function setInstanceEnabled(
   await writeStoredInstances(next);
 
   const target = next.find((instance) => instance.id === id);
-  if (!target) {
+  if (!target || (enabled && target.archived)) {
     return;
   }
 
@@ -167,37 +379,115 @@ export async function updateInstance(
   patch: Partial<Omit<CompanionInstance, "id">>,
 ): Promise<void> {
   const instances = await readStoredInstances();
+  const target = instances.find((instance) => instance.id === id);
+  if (!target) {
+    return;
+  }
+
+  const { name: namePatch, ...restPatch } = patch;
+  const oldCharacterId = target.characterId;
+  let characterId = oldCharacterId;
+  let resolvedName = target.name;
+
+  if (namePatch !== undefined) {
+    if (isBuiltinCharacterId(oldCharacterId)) {
+      resolvedName = namePatch.trim() || target.name;
+    } else {
+      const trimmed = namePatch.trim();
+      if (trimmed !== "" && trimmed !== oldCharacterId) {
+        characterId = await renameTomojiCharacter(oldCharacterId, trimmed);
+      }
+      resolvedName = characterId;
+    }
+  }
+
+  const next = instances.map((instance) => {
+    if (instance.characterId === oldCharacterId) {
+      return {
+        ...instance,
+        characterId,
+        name: resolvedName,
+        ...(instance.id === id ? restPatch : {}),
+      };
+    }
+
+    if (instance.id === id) {
+      return {
+        ...instance,
+        ...restPatch,
+        characterId,
+        name: resolvedName,
+      };
+    }
+
+    return instance;
+  });
+
+  await writeStoredInstances(next);
+}
+
+export async function archiveInstance(id: string): Promise<void> {
+  const instances = await readStoredInstances();
+  const target = instances.find((instance) => instance.id === id);
+  if (!target) {
+    return;
+  }
+
+  if (target.enabled) {
+    await destroyCompanionInstanceWindow(id);
+  }
+
   const next = instances.map((instance) =>
-    instance.id === id ? { ...instance, ...patch } : instance,
+    instance.id === id
+      ? { ...instance, archived: true, enabled: false }
+      : instance,
   );
   await writeStoredInstances(next);
+}
+
+export async function unarchiveInstance(id: string): Promise<void> {
+  const instances = await readStoredInstances();
+  const next = instances.map((instance) =>
+    instance.id === id ? { ...instance, archived: false } : instance,
+  );
+  await writeStoredInstances(next);
+}
+
+// keeps archived companions at the tail; only reorders the active list
+export async function reorderActiveInstances(
+  orderedActiveIds: string[],
+): Promise<void> {
+  const instances = await readStoredInstances();
+  const active = instances.filter((instance) => !instance.archived);
+  const archived = instances.filter((instance) => instance.archived);
+  const byId = new Map(active.map((instance) => [instance.id, instance]));
+
+  const reorderedActive = orderedActiveIds
+    .map((id) => byId.get(id))
+    .filter((instance): instance is CompanionInstance => instance !== undefined);
+
+  const missingActive = active.filter(
+    (instance) => !orderedActiveIds.includes(instance.id),
+  );
+
+  await writeStoredInstances([
+    ...reorderedActive,
+    ...missingActive,
+    ...archived,
+  ]);
 }
 
 let bootstrapInFlight: Promise<CompanionInstance[]> | null = null;
 
 async function bootstrapCompanionsInternal(): Promise<CompanionInstance[]> {
-  await ensureBuiltinCharacterStored();
-  let instances = await readStoredInstances();
+  const instances = await reconcileTomojiRegistry({ spawnNew: false });
 
-  if (instances.length === 0) {
-    const builtin = await getCharacter(BUILTIN_CHARACTER_ID);
-    if (!builtin) {
-      throw new Error("built-in character is missing from local storage");
-    }
-    const position = await defaultSpawnAnchor(0);
-    const seed = instanceFromCharacter(
-      "default",
-      builtin.manifest.name,
-      builtin.manifest,
-      position,
-    );
-    instances = [seed];
-    await writeStoredInstances(instances);
-  }
-
-  for (const instance of instances) {
-    if (instance.enabled) {
-      await spawnInstanceWindow(instance);
+  const { restoreCompanionsOnLaunch } = await getAppSettings();
+  if (restoreCompanionsOnLaunch) {
+    for (const instance of instances) {
+      if (instance.enabled && !instance.archived) {
+        await spawnInstanceWindow(instance);
+      }
     }
   }
 

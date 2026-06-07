@@ -181,6 +181,10 @@ fn surface_from_hwnd(hwnd: windows::Win32::Foundation::HWND) -> Option<WindowSur
             return None;
         }
 
+        if is_phantom_snap_surface(hwnd, &rect) {
+            return None;
+        }
+
         let band = title_bar_band_height();
         let top = rect.top;
         let title_bar_bottom = top + band;
@@ -431,8 +435,57 @@ fn window_class_name(hwnd: windows::Win32::Foundation::HWND) -> String {
 fn is_disallowed_shell_root(hwnd: windows::Win32::Foundation::HWND) -> bool {
     matches!(
         window_class_name(hwnd).as_str(),
-        "Shell_TrayWnd" | "Shell_SecondaryTrayWnd"
+        "Shell_TrayWnd" | "Shell_SecondaryTrayWnd" | "Progman" | "WorkerW"
     )
+}
+
+#[cfg(windows)]
+fn window_title(hwnd: windows::Win32::Foundation::HWND) -> String {
+    use windows::Win32::UI::WindowsAndMessaging::GetWindowTextW;
+
+    let mut buffer = [0u16; 512];
+
+    unsafe {
+        let len = GetWindowTextW(hwnd, &mut buffer);
+        if len == 0 {
+            return String::new();
+        }
+
+        String::from_utf16_lossy(&buffer[..len as usize])
+    }
+}
+
+#[cfg(windows)]
+fn rect_covers_work_area(rect: &windows::Win32::Foundation::RECT) -> bool {
+    const EDGE_TOLERANCE: i32 = 4;
+
+    let center_x = (rect.left + rect.right) / 2;
+    let probe_y = rect.top.max(rect.bottom.saturating_sub(1));
+    let Some(info) = monitor_info_at_point(center_x, probe_y) else {
+        return false;
+    };
+
+    let work = info.rcWork;
+
+    rect.left <= work.left + EDGE_TOLERANCE
+        && rect.right >= work.right - EDGE_TOLERANCE
+        && rect.top <= work.top + EDGE_TOLERANCE
+        && rect.bottom >= work.bottom - EDGE_TOLERANCE
+}
+
+// invisible fullscreen hosts (empty UWP frame, desktop, gpu overlay) register as
+// huge window surfaces and magnet-snag pets at screen edges above the taskbar
+#[cfg(windows)]
+fn is_phantom_snap_surface(
+    hwnd: windows::Win32::Foundation::HWND,
+    rect: &windows::Win32::Foundation::RECT,
+) -> bool {
+    match window_class_name(hwnd).as_str() {
+        "CEF-OSC-WIDGET" => true,
+        "ApplicationFrameWindow" => window_title(hwnd).is_empty() && rect_covers_work_area(rect),
+        "Windows.UI.Core.CoreWindow" => window_title(hwnd).is_empty() && rect_covers_work_area(rect),
+        _ => false,
+    }
 }
 
 #[cfg(windows)]

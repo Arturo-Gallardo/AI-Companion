@@ -6,18 +6,16 @@ import type {
 } from "./types";
 import type { SurfaceLock } from "../types/companion";
 
-export const COMPANION_ASSET_BASE = "/companion/beyond-birthday";
-
-// shimeji anchor: feet at bottom-center of the 128x128 sprite
+// default sprite geometry ratios for anchor math shared across all characters
 export const SPRITE_WIDTH = 128;
 export const SPRITE_HEIGHT = 128;
 export const SPRITE_ANCHOR = { x: 64, y: 128 } as const;
 
-// title bar sit — butt on the bar, legs/feet hang below (shime31–33)
+// title bar sit — butt on the bar, legs/feet hang below
 export const TITLE_BAR_SIT_ANCHOR = { x: 64, y: 112 } as const;
 export const TITLE_BAR_SIT_Y_OFFSET = SPRITE_ANCHOR.y - TITLE_BAR_SIT_ANCHOR.y;
 
-// window underside crawl — same sprites as shimeji ceiling crawl (shime23–25)
+// window underside crawl
 export const UNDERSIDE_GRAB_ANCHOR = { x: 64, y: 48 } as const;
 
 // ~25ms per tick matches the shimeji engine cadence
@@ -29,99 +27,6 @@ export const LANDING_THRESHOLD = 4;
 export const FALL_GRAVITY = 3;
 export const FALL_AIR_RESISTANCE_X = 0.05;
 export const FALL_AIR_RESISTANCE_Y = 0.05;
-
-// animation timings ported from original shimeji 動作.xml
-export const IDLE_ANIMATION: AnimationDefinition = {
-  frames: ["shime1.png"],
-  tickDuration: 6,
-  velocity: { x: 0, y: 0 },
-};
-
-export const WALK_ANIMATION: AnimationDefinition = {
-  frames: ["shime1.png", "shime2.png", "shime3.png"],
-  tickDuration: 6,
-  velocity: { x: -2, y: 0 },
-};
-
-export const FALL_ANIMATION: AnimationDefinition = {
-  frames: ["shime4.png"],
-  tickDuration: 250,
-  velocity: { x: 0, y: 0 },
-};
-
-export const BOUNCE_ANIMATION: AnimationDefinition = {
-  frames: ["shime18.png", "shime19.png"],
-  tickDuration: 4,
-  velocity: { x: 0, y: 0 },
-};
-
-export const RESIST_ANIMATION: AnimationDefinition = {
-  frames: ["shime5.png", "shime6.png"],
-  tickDuration: 5,
-  velocity: { x: 0, y: 0 },
-};
-
-// sit — single pose held still (Beyond Birthday default: shime15)
-export const SIT_ANIMATION: AnimationDefinition = {
-  frames: ["shime15.png"],
-  tickDuration: 250,
-  velocity: { x: 0, y: 0 },
-};
-
-// perched on a window title bar — legs dangle in front for a 3d look
-export const TITLE_BAR_SIT_ANIMATION: AnimationDefinition = {
-  frames: ["shime31.png"],
-  tickDuration: 250,
-  velocity: { x: 0, y: 0 },
-};
-
-export const TITLE_BAR_DANGLE_ANIMATION: AnimationDefinition = {
-  frames: ["shime31.png", "shime32.png", "shime31.png", "shime33.png"],
-  tickDuration: 5,
-  frameTickDurations: [5, 15, 5, 15],
-  velocity: { x: 0, y: 0 },
-};
-
-// clinging to a window wall — shimeji GrabWall / ClimbWall
-export const GRAB_WALL_ANIMATION: AnimationDefinition = {
-  frames: ["shime13.png"],
-  tickDuration: 250,
-  velocity: { x: 0, y: 0 },
-};
-
-export const CLIMB_WALL_ANIMATION: AnimationDefinition = {
-  frames: ["shime14.png", "shime12.png"],
-  tickDuration: 4,
-  frameTickDurations: [16, 4],
-  velocity: { x: 0, y: -2 },
-};
-
-export const CLIMB_WALL_DOWN_ANIMATION: AnimationDefinition = {
-  ...CLIMB_WALL_ANIMATION,
-  velocity: { x: 0, y: 2 },
-};
-
-export const GRAB_UNDERSIDE_ANIMATION: AnimationDefinition = {
-  frames: ["shime23.png"],
-  tickDuration: 250,
-  velocity: { x: 0, y: 0 },
-};
-
-export const CRAWL_UNDERSIDE_ANIMATION: AnimationDefinition = {
-  frames: [
-    "shime25.png",
-    "shime25.png",
-    "shime23.png",
-    "shime24.png",
-    "shime24.png",
-    "shime24.png",
-    "shime23.png",
-    "shime25.png",
-  ],
-  tickDuration: 4,
-  frameTickDurations: [16, 4, 4, 16, 4, 4, 4, 4],
-  velocity: { x: -2, y: 0 },
-};
 
 export function getFrameTickDuration(
   animation: AnimationDefinition,
@@ -143,34 +48,6 @@ export const GRAB_ENTER_STRONG = 6.5;
 export const GRAB_EXIT_STRONG = 4.5;
 
 export type { GrabbedLeanTier } from "./types";
-
-export const DEFAULT_GRABBED_LEAN_FRAME = "shime1.png";
-
-// grabbed uses dynamic frame selection via lean tier hysteresis
-export const GRABBED_ANIMATION: AnimationDefinition = {
-  frames: ["shime1.png"],
-  tickDuration: 5,
-  velocity: { x: 0, y: 0 },
-};
-
-const ANIMATION_BY_ACTION: Record<CompanionAction, AnimationDefinition> = {
-  idle: IDLE_ANIMATION,
-  walk: WALK_ANIMATION,
-  sit: SIT_ANIMATION,
-  sitAlt: SIT_ANIMATION,
-  sitAlt2: SIT_ANIMATION,
-  sitOnBar: TITLE_BAR_SIT_ANIMATION,
-  dangleOnBar: TITLE_BAR_DANGLE_ANIMATION,
-  grabWall: GRAB_WALL_ANIMATION,
-  climbWall: CLIMB_WALL_ANIMATION,
-  climbWallDown: CLIMB_WALL_DOWN_ANIMATION,
-  grabCeiling: GRAB_UNDERSIDE_ANIMATION,
-  climbCeiling: CRAWL_UNDERSIDE_ANIMATION,
-  grabbed: GRABBED_ANIMATION,
-  resist: RESIST_ANIMATION,
-  fall: FALL_ANIMATION,
-  bounce: BOUNCE_ANIMATION,
-};
 
 export function usesTitleBarSitAnchor(action: CompanionAction): boolean {
   return action === "sitOnBar" || action === "dangleOnBar";
@@ -229,29 +106,6 @@ export function getSpriteAnchorForAction(
   }
 
   return SPRITE_ANCHOR;
-}
-
-export function getAnimationForAction(
-  action: CompanionAction,
-): AnimationDefinition {
-  return ANIMATION_BY_ACTION[action];
-}
-
-export function getGrabbedFrameFromLeanTier(tier: GrabbedLeanTier): string {
-  switch (tier) {
-    case "lightLeft":
-      return DEFAULT_GRABBED_LEAN_FRAME;
-    case "mildLeft":
-      return "shime7.png";
-    case "strongLeft":
-      return "shime9.png";
-    case "lightRight":
-      return DEFAULT_GRABBED_LEAN_FRAME;
-    case "mildRight":
-      return "shime8.png";
-    case "strongRight":
-      return "shime10.png";
-  }
 }
 
 function lightTierFromLean(lean: number): GrabbedLeanTier {
@@ -328,14 +182,4 @@ export function resolveGrabbedLeanTier(
       }
       return "lightRight";
   }
-}
-
-export function getGrabbedFrameFromVelocity(velocityX: number): string {
-  return getGrabbedFrameFromLeanTier(
-    resolveGrabbedLeanTier("lightLeft", velocityX),
-  );
-}
-
-export function getFramePath(frame: string): string {
-  return `${COMPANION_ASSET_BASE}/${frame}`;
 }

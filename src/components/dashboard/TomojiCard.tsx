@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useCharacterAnimationRegistry } from "../../hooks/useCharacterAnimationRegistry";
 import type { AnimationRegistry } from "../../services/animationRegistry";
+import { isBuiltinCharacterId } from "../../services/characterLibrary";
 import type { CompanionInstance } from "../../types/companionInstance";
 import { CompanionSprite } from "../companion/CompanionSprite";
 
@@ -8,9 +9,18 @@ const CARD_SPRITE_HEIGHT = 72;
 
 interface TomojiCardProps {
   instance: CompanionInstance;
+  reorderable?: boolean;
+  isDragging?: boolean;
+  isDropTarget?: boolean;
+  onDragStart?: (id: string) => void;
+  onDragEnd?: () => void;
+  onDragOver?: (id: string) => void;
+  onDrop?: (id: string) => void;
   onDelete: (id: string) => void;
   onToggle: (id: string, enabled: boolean) => void;
   onEdit: (id: string) => void;
+  onArchive?: (id: string) => void;
+  onRestore?: (id: string) => void;
 }
 
 interface TomojiCardSpriteProps {
@@ -53,11 +63,24 @@ function TomojiCardSpriteLoader({ characterId }: { characterId: string }) {
 
 export function TomojiCard({
   instance,
+  reorderable = false,
+  isDragging = false,
+  isDropTarget = false,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
   onDelete,
   onToggle,
   onEdit,
+  onArchive,
+  onRestore,
 }: TomojiCardProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const isBuiltin = isBuiltinCharacterId(instance.characterId);
+  const canDelete = !isBuiltin;
+  const canArchive = onArchive !== undefined;
+  const isArchived = instance.archived === true;
 
   const handleDelete = () => {
     onDelete(instance.id);
@@ -69,24 +92,66 @@ export function TomojiCard({
     setIsMenuOpen(false);
   };
 
+  const handleArchive = () => {
+    onArchive?.(instance.id);
+    setIsMenuOpen(false);
+  };
+
+  const handleRestore = () => {
+    onRestore?.(instance.id);
+    setIsMenuOpen(false);
+  };
+
   return (
     <article
-      className={`relative flex aspect-square w-full max-w-[11rem] flex-col items-center justify-between rounded-2xl border px-4 py-4 ${
-        instance.enabled ? "border-white" : "border-neutral-500/80"
-      } bg-neutral-950`}
+      draggable={reorderable}
+      onDragStart={(event) => {
+        if (!reorderable) {
+          return;
+        }
+        const target = event.target;
+        if (target instanceof Element && target.closest("button")) {
+          event.preventDefault();
+          return;
+        }
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", instance.id);
+        onDragStart?.(instance.id);
+      }}
+      onDragEnd={() => onDragEnd?.()}
+      onDragOver={(event) => {
+        if (!reorderable) {
+          return;
+        }
+        event.preventDefault();
+        onDragOver?.(instance.id);
+      }}
+      onDrop={(event) => {
+        if (!reorderable) {
+          return;
+        }
+        event.preventDefault();
+        onDrop?.(instance.id);
+      }}
+      className={`relative flex aspect-square w-full max-w-[11rem] flex-col items-center justify-between rounded-2xl border px-4 py-4 transition-opacity ${
+        isDragging ? "opacity-40" : ""
+      } ${isDropTarget ? "ring-2 ring-white/60" : ""} ${
+        instance.enabled && !isArchived ? "border-white" : "border-neutral-500/80"
+      } bg-neutral-950 ${reorderable ? "cursor-grab active:cursor-grabbing" : ""}`}
     >
       <div className="flex w-full items-center justify-between">
         <button
           type="button"
           onClick={() => onToggle(instance.id, !instance.enabled)}
+          disabled={isArchived}
           className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-            instance.enabled
+            instance.enabled && !isArchived
               ? "bg-white text-black"
-              : "bg-neutral-800 text-neutral-400 hover:text-white"
+              : "bg-neutral-800 text-neutral-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           }`}
-          aria-pressed={instance.enabled}
+          aria-pressed={instance.enabled && !isArchived}
         >
-          {instance.enabled ? "On" : "Off"}
+          {instance.enabled && !isArchived ? "On" : "Off"}
         </button>
 
         <button
@@ -105,7 +170,7 @@ export function TomojiCard({
       </div>
 
       <p className="w-full truncate text-center text-sm font-bold text-white">
-        {instance.name}
+        {isBuiltin ? instance.name : instance.characterId}
       </p>
 
       {isMenuOpen ? (
@@ -117,13 +182,33 @@ export function TomojiCard({
           >
             Edit
           </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="w-full rounded-md px-3 py-2 text-left text-xs font-bold text-red-300 hover:bg-red-500/15"
-          >
-            Delete
-          </button>
+          {canArchive ? (
+            <button
+              type="button"
+              onClick={handleArchive}
+              className="w-full rounded-md px-3 py-2 text-left text-xs font-bold text-neutral-200 hover:bg-neutral-800"
+            >
+              Archive
+            </button>
+          ) : null}
+          {onRestore ? (
+            <button
+              type="button"
+              onClick={handleRestore}
+              className="w-full rounded-md px-3 py-2 text-left text-xs font-bold text-neutral-200 hover:bg-neutral-800"
+            >
+              Restore
+            </button>
+          ) : null}
+          {canDelete ? (
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="w-full rounded-md px-3 py-2 text-left text-xs font-bold text-red-300 hover:bg-red-500/15"
+            >
+              Delete
+            </button>
+          ) : null}
         </div>
       ) : null}
     </article>
