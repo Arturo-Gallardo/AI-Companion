@@ -92,6 +92,7 @@ interface UseCompanionBehaviorOptions {
   initialAnchor?: ScreenPosition;
   dialogueSettings?: DialogueSettings;
   behaviorSettings?: BehaviorSettings;
+  isMuted?: boolean;
 }
 
 export function useCompanionBehavior({
@@ -101,6 +102,7 @@ export function useCompanionBehavior({
   initialAnchor,
   dialogueSettings,
   behaviorSettings,
+  isMuted = false,
 }: UseCompanionBehaviorOptions): UseCompanionBehaviorResult {
   const behaviorSettingsRef = useRef(
     normalizeBehaviorSettings(behaviorSettings),
@@ -165,6 +167,7 @@ export function useCompanionBehavior({
   const dialogueReturnStateRef = useRef<"idle" | "sitting">("idle");
   const sittingModeRef = useRef<SittingMode>(null);
   const sittingActionRef = useRef<CompanionAction>("sit");
+  const isMutedRef = useRef(isMuted);
 
   const isWallLockedRef = useRef(isWallLocked);
   const isUndersideLockedRef = useRef(isUndersideLocked);
@@ -181,6 +184,10 @@ export function useCompanionBehavior({
   useEffect(() => {
     isFrozenRef.current = isFrozen;
   }, [isFrozen]);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
 
   const unfreeze = useCallback(() => {
     isFrozenRef.current = false;
@@ -254,6 +261,10 @@ export function useCompanionBehavior({
   }, []);
 
   const startDialogue = useCallback((text: string) => {
+    if (isMutedRef.current) {
+      return;
+    }
+
     const currentState = behaviorStateRef.current;
     if (
       currentState !== "idle" &&
@@ -303,6 +314,12 @@ export function useCompanionBehavior({
     setBehaviorState("idle");
     setAction("idle");
   }, []);
+
+  useEffect(() => {
+    if (isMuted) {
+      dismissDialogue();
+    }
+  }, [dismissDialogue, isMuted]);
 
   const startSitting = useCallback(
     (mode: "manual" | "auto") => {
@@ -945,6 +962,7 @@ export function useCompanionBehavior({
     startDialogue,
     characterId,
     dialogueSettings,
+    isMuted,
   });
 
   const finishClimbing = useCallback(

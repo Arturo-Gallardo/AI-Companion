@@ -7,6 +7,7 @@ import {
   pickDialogueLine,
 } from "../../services/dialogueManager";
 import type { CompanionInstance } from "../../types/companionInstance";
+import { updateInstance } from "../../services/companionInstanceManager";
 
 const BLOCKED_COMPANION_COMMAND_STATES = new Set([
   "dragging",
@@ -27,8 +28,10 @@ export function DashboardOptionsPanel({ instance }: DashboardOptionsPanelProps) 
   const isSitting = mirrorState.behaviorState === "sitting";
   const canToggleSit = isSitting || !isCommandBlocked;
   const isFrozen = mirrorState.isFrozen;
+  const isMuted = instance.muted === true;
   const canDialogue =
     hasDialogueLines(instance.dialogueSettings, instance.characterId) &&
+    !isMuted &&
     !isCommandBlocked;
 
   const handleDialogueClick = () => {
@@ -57,6 +60,10 @@ export function DashboardOptionsPanel({ instance }: DashboardOptionsPanelProps) 
 
   const handleFreezeClick = () => {
     void emitFreezeToggle(instance.id);
+  };
+
+  const handleMuteClick = () => {
+    void updateInstance(instance.id, { muted: !isMuted });
   };
 
   return (
@@ -99,10 +106,15 @@ export function DashboardOptionsPanel({ instance }: DashboardOptionsPanelProps) 
 
           <button
             type="button"
-            disabled
-            className="flex flex-1 items-center justify-center rounded-md border-2 border-neutral-600/70 text-lg text-neutral-200 disabled:cursor-default"
+            onClick={handleMuteClick}
+            aria-pressed={isMuted}
+            className={`flex flex-1 items-center justify-center rounded-md border-2 text-lg text-neutral-200 hover:border-neutral-400/80 hover:text-white ${
+              isMuted
+                ? "border-neutral-400/90 text-white"
+                : "border-neutral-600/70"
+            }`}
           >
-            Mute
+            {isMuted ? "Unmute" : "Mute"}
           </button>
         </div>
       </div>

@@ -112,6 +112,7 @@ export function useCompanionMovement(
   const surfaceLockRef = useRef<SurfaceLock | null>(null);
   const lockedSurfaceSnapshotRef = useRef<LockedSurfaceSnapshot | null>(null);
   const lockedSurfaceCacheRef = useRef<WindowSurface | null>(null);
+  const initialAnchorRef = useRef(initialAnchor);
 
   const { surfaces, surfacesRef } = useCompanionWindowSurfaces(
     isReady && surfaceLock !== null,
@@ -304,6 +305,8 @@ export function useCompanionMovement(
       getAnchorYOffset,
     ],
   );
+  const applyAnchorPositionRef = useRef(applyAnchorPosition);
+  applyAnchorPositionRef.current = applyAnchorPosition;
 
   const clearSurfaceLock = useCallback(() => {
     surfaceLockRef.current = null;
@@ -423,9 +426,10 @@ export function useCompanionMovement(
       desktopBoundsRef.current = bounds;
 
       // prefer the instance's saved anchor; fall back to the default corner
-      const startPosition = initialAnchor ?? getRightmostMonitorFloorStart(bounds);
+      const startPosition =
+        initialAnchorRef.current ?? getRightmostMonitorFloorStart(bounds);
 
-      await applyAnchorPosition(startPosition, "grounded");
+      await applyAnchorPositionRef.current(startPosition, "grounded");
       if (!cancelled) {
         setIsReady(true);
       }
@@ -436,7 +440,7 @@ export function useCompanionMovement(
     return () => {
       cancelled = true;
     };
-  }, [applyAnchorPosition, initialAnchor]);
+  }, []);
 
   const getAnchorPosition = useCallback((): ScreenPosition => {
     return anchorRef.current;

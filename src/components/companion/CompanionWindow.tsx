@@ -54,6 +54,7 @@ function CompanionWindowInner({ instance, registry }: CompanionWindowInnerProps)
     initialAnchor: instance.position,
     dialogueSettings: instance.dialogueSettings,
     behaviorSettings: instance.behaviorSettings,
+    isMuted: instance.muted === true,
   });
 
   useCompanionWindowSizeSync({

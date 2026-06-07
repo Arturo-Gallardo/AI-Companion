@@ -30,6 +30,7 @@ interface UseAutonomousDialogueOptions {
   behaviorStateRef: RefObject<CompanionBehaviorState>;
   startDialogue: (text: string) => void;
   characterId: string;
+  isMuted: boolean;
   // the speaking companion's lines + how chatty it is (0..1)
   dialogueSettings?: DialogueSettings;
 }
@@ -42,6 +43,7 @@ export function useAutonomousDialogue({
   behaviorStateRef,
   startDialogue,
   characterId,
+  isMuted,
   dialogueSettings,
 }: UseAutonomousDialogueOptions): void {
   const startDialogueRef = useRef(startDialogue);
@@ -55,7 +57,12 @@ export function useAutonomousDialogue({
   }, [characterId, dialogueSettings, startDialogue]);
 
   useEffect(() => {
-    if (!isReady || isFrozen || !isAutonomousDialogueEligible(behaviorState)) {
+    if (
+      !isReady ||
+      isFrozen ||
+      isMuted ||
+      !isAutonomousDialogueEligible(behaviorState)
+    ) {
       return;
     }
 
@@ -102,5 +109,12 @@ export function useAutonomousDialogue({
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [behaviorState, behaviorStateRef, isFrozen, isFrozenRef, isReady]);
+  }, [
+    behaviorState,
+    behaviorStateRef,
+    isFrozen,
+    isFrozenRef,
+    isMuted,
+    isReady,
+  ]);
 }

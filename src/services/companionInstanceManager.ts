@@ -285,6 +285,7 @@ function instanceFromCharacter(
     velocity: { x: 0, y: 0 },
     scale: manifest.defaultScale,
     enabled,
+    muted: false,
     currentAnimation: "idle",
     behaviorState: "idle",
     behaviorSettings: { ...manifest.behaviorSettings },
