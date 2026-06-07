@@ -47,6 +47,12 @@ function shouldFlipSprite(
     action !== "sitAlt2" &&
     action !== "sitOnBar" &&
     action !== "dangleOnBar" &&
+    action !== "emote" &&
+    action !== "emote2" &&
+    action !== "emote3" &&
+    action !== "emote4" &&
+    action !== "emote5" &&
+    action !== "emote6" &&
     action !== "grabCeiling" &&
     action !== "climbCeiling"
   ) {

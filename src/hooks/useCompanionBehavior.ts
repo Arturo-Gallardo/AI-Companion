@@ -8,6 +8,7 @@ import type {
   FacingDirection,
   GrabbedLeanTier,
 } from "../animations/types";
+import type { CompanionMenuAnimationAction } from "../types/companionMenu";
 import { LANDING_THRESHOLD, resolveDisplayAction, usesTitleBarSitAnchor } from "../animations/beyondBirthday";
 import {
   type AnchorClampMode,
@@ -69,11 +70,12 @@ interface UseCompanionBehaviorResult {
   ) => Promise<void>;
   onWalkTick: (deltaX: number) => void;
   onClimbTick: (deltaY: number) => void;
-  onBounceComplete: () => void;
+  onAnimationCycleComplete: (action: CompanionAction) => void;
   onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
   startDialogue: (text: string) => void;
   dismissDialogue: () => void;
   toggleSit: () => void;
+  playMenuAnimation: (action: CompanionMenuAnimationAction) => void;
   turnAround: () => void;
   walkToAnchorX: (screenX: number) => void;
   crawlToAnchorX: (screenX: number) => void;
@@ -322,11 +324,11 @@ export function useCompanionBehavior({
   }, [dismissDialogue, isMuted]);
 
   const startSitting = useCallback(
-    (mode: "manual" | "auto") => {
+    (mode: "manual" | "auto", requestedAction?: CompanionAction) => {
       targetXRef.current = null;
       setDialogueText(null);
       sittingModeRef.current = mode;
-      const sitAction = registry.pickFloorSitAction();
+      const sitAction = requestedAction ?? registry.pickFloorSitAction();
       sittingActionRef.current = sitAction;
       setBehaviorState("sitting");
       setAction(sitAction);
@@ -354,6 +356,40 @@ export function useCompanionBehavior({
     unfreeze();
     startSitting("manual");
   }, [returnToIdle, startSitting, unfreeze]);
+
+  const playMenuAnimation = useCallback(
+    (nextAction: CompanionMenuAnimationAction) => {
+      const currentState = behaviorStateRef.current;
+      if (
+        currentState !== "idle" &&
+        currentState !== "walking" &&
+        currentState !== "sitting" &&
+        currentState !== "dialoguing" &&
+        currentState !== "emoting"
+      ) {
+        return;
+      }
+
+      unfreeze();
+
+      if (
+        nextAction === "sit" ||
+        nextAction === "sitAlt" ||
+        nextAction === "sitAlt2"
+      ) {
+        startSitting("manual", nextAction);
+        return;
+      }
+
+      targetXRef.current = null;
+      targetYRef.current = null;
+      sittingModeRef.current = null;
+      setDialogueText(null);
+      setBehaviorState("emoting");
+      setAction(nextAction);
+    },
+    [startSitting, unfreeze],
+  );
 
   useEffect(() => {
     if (behaviorState !== "dialoguing" || dialogueText === null) {
@@ -873,57 +909,6 @@ export function useCompanionBehavior({
     startCrawlingTo,
   ]);
 
-  // on a window wall, sometimes climb up or down
-  useEffect(() => {
-    if (
-      !isReady ||
-      behaviorState !== "idle" ||
-      !isWallLocked ||
-      isFrozen ||
-      behaviorSettingsRef.current.actionFrequency <= 0
-    ) {
-      return;
-    }
-
-    const actionFrequency = behaviorSettingsRef.current.actionFrequency;
-
-    const timeoutId = window.setTimeout(() => {
-      if (behaviorStateRef.current !== "idle" || isFrozenRef.current) {
-        return;
-      }
-
-      const range = getVerticalClimbRange();
-      if (!range) {
-        return;
-      }
-
-      let nextTarget = randomBetween(range.minY, range.maxY);
-
-      if (Math.abs(nextTarget - anchorYRef.current) < 48) {
-        nextTarget =
-          nextTarget >= anchorYRef.current ? range.minY : range.maxY;
-      }
-
-      if (Math.abs(nextTarget - anchorYRef.current) < 48) {
-        return;
-      }
-
-      startClimbingTo(nextTarget);
-    }, randomIdleDelay(actionFrequency));
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [
-    behaviorSettings,
-    behaviorState,
-    getVerticalClimbRange,
-    isFrozen,
-    isReady,
-    isWallLocked,
-    startClimbingTo,
-  ]);
-
   // auto sit eventually stands back up; manual sit stays until the user toggles it
   useEffect(() => {
     if (
@@ -1063,13 +1048,18 @@ export function useCompanionBehavior({
     [behaviorState, clampAnchorX, facing, moveBy, tryFinishWalkAtWall],
   );
 
-  const onBounceComplete = useCallback(() => {
-    if (behaviorState !== "bouncing") {
-      return;
-    }
-
-    returnToIdle();
-  }, [behaviorState, returnToIdle]);
+  const onAnimationCycleComplete = useCallback(
+    (completedAction: CompanionAction) => {
+      const currentState = behaviorStateRef.current;
+      if (
+        (completedAction === "bounce" && currentState === "bouncing") ||
+        (completedAction.startsWith("emote") && currentState === "emoting")
+      ) {
+        returnToIdle();
+      }
+    },
+    [returnToIdle],
+  );
 
   const canOpenContextMenu = useMemo(
     () =>
@@ -1078,6 +1068,7 @@ export function useCompanionBehavior({
         behaviorState === "walking" ||
         behaviorState === "climbing" ||
         behaviorState === "sitting" ||
+        behaviorState === "emoting" ||
         behaviorState === "dialoguing" ||
         behaviorState === "falling"),
     [behaviorState, isReady],
@@ -1097,9 +1088,16 @@ export function useCompanionBehavior({
         isWallLocked,
         isUndersideLocked,
         isFrozen,
+        registry.contextMenuActions,
       );
     },
-    [canOpenContextMenu, isFrozen, isUndersideLocked, isWallLocked],
+    [
+      canOpenContextMenu,
+      isFrozen,
+      isUndersideLocked,
+      isWallLocked,
+      registry.contextMenuActions,
+    ],
   );
 
   return {
@@ -1116,11 +1114,12 @@ export function useCompanionBehavior({
     setAnchorPosition,
     onWalkTick,
     onClimbTick,
-    onBounceComplete,
+    onAnimationCycleComplete,
     onPointerDown,
     startDialogue,
     dismissDialogue,
     toggleSit,
+    playMenuAnimation,
     turnAround,
     walkToAnchorX,
     crawlToAnchorX,

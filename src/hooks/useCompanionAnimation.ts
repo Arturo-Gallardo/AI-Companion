@@ -19,7 +19,7 @@ interface UseCompanionAnimationOptions {
   grabbedLeanTier?: GrabbedLeanTier;
   onTick?: (deltaX: number) => void;
   onClimbTick?: (deltaY: number) => void;
-  onBounceComplete?: () => void;
+  onAnimationCycleComplete?: (action: CompanionAction) => void;
 }
 
 interface UseCompanionAnimationResult {
@@ -69,19 +69,18 @@ export function useCompanionAnimation({
   grabbedLeanTier = "lightLeft",
   onTick,
   onClimbTick,
-  onBounceComplete,
+  onAnimationCycleComplete,
 }: UseCompanionAnimationOptions): UseCompanionAnimationResult {
   const [frameIndex, setFrameIndex] = useState(0);
   const frameIndexRef = useRef(0);
   const walkStepRef = useRef(0);
   const frameShownAtRef = useRef(performance.now());
-  const bounceCyclesRef = useRef(0);
   const actionRef = useRef(action);
   const facingRef = useRef(facing);
   const registryRef = useRef(registry);
   const onTickRef = useRef(onTick);
   const onClimbTickRef = useRef(onClimbTick);
-  const onBounceCompleteRef = useRef(onBounceComplete);
+  const onAnimationCycleCompleteRef = useRef(onAnimationCycleComplete);
 
   useEffect(() => {
     actionRef.current = action;
@@ -92,8 +91,8 @@ export function useCompanionAnimation({
   useEffect(() => {
     onTickRef.current = onTick;
     onClimbTickRef.current = onClimbTick;
-    onBounceCompleteRef.current = onBounceComplete;
-  }, [onBounceComplete, onClimbTick, onTick]);
+    onAnimationCycleCompleteRef.current = onAnimationCycleComplete;
+  }, [onAnimationCycleComplete, onClimbTick, onTick]);
 
   useEffect(() => {
     const animation = registryRef.current.getAnimation(action);
@@ -109,7 +108,6 @@ export function useCompanionAnimation({
       usesShimejiPlayback,
     );
     frameShownAtRef.current = performance.now();
-    bounceCyclesRef.current = 0;
     setFrameIndex(frameIndexRef.current);
   }, [action]);
 
@@ -151,16 +149,19 @@ export function useCompanionAnimation({
 
       frameShownAtRef.current = performance.now();
 
-      if (activeAction === "bounce") {
+      if (
+        activeAction === "bounce" ||
+        activeAction === "emote" ||
+        activeAction === "emote2" ||
+        activeAction === "emote3" ||
+        activeAction === "emote4" ||
+        activeAction === "emote5" ||
+        activeAction === "emote6"
+      ) {
         const nextIndex = frameIndexRef.current + 1;
 
         if (nextIndex >= animation.frames.length) {
-          bounceCyclesRef.current += 1;
-
-          if (bounceCyclesRef.current >= 1) {
-            onBounceCompleteRef.current?.();
-          }
-
+          onAnimationCycleCompleteRef.current?.(activeAction);
           frameIndexRef.current = 0;
           setFrameIndex(0);
           return;

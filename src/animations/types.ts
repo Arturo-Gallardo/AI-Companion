@@ -32,7 +32,13 @@ export type CompanionAction =
   | "grabbed"
   | "resist"
   | "fall"
-  | "bounce";
+  | "bounce"
+  | "emote"
+  | "emote2"
+  | "emote3"
+  | "emote4"
+  | "emote5"
+  | "emote6";
 
 export type FacingDirection = "left" | "right";
 

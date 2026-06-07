@@ -4,6 +4,7 @@ import { listenOnThisWebview } from "./companionInstanceContext";
 import type {
   CompanionMenuAction,
   CompanionMenuActionPayload,
+  CompanionMenuAnimationAction,
   CompanionMenuConfigPayload,
 } from "../types/companionMenu";
 
@@ -16,6 +17,7 @@ export async function showCompanionMenu(
   wallLocked: boolean,
   undersideLocked: boolean,
   frozen: boolean,
+  availableActions: readonly CompanionMenuAnimationAction[],
 ): Promise<void> {
   await invoke("show_companion_menu", {
     screenX,
@@ -23,6 +25,7 @@ export async function showCompanionMenu(
     wallLocked,
     undersideLocked,
     frozen,
+    availableActions,
   });
 }
 

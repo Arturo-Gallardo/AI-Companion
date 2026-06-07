@@ -34,11 +34,12 @@ function CompanionWindowInner({ instance, registry }: CompanionWindowInnerProps)
     setAnchorPosition,
     onWalkTick,
     onClimbTick,
-    onBounceComplete,
+    onAnimationCycleComplete,
     onPointerDown,
     startDialogue,
     dismissDialogue,
     toggleSit,
+    playMenuAnimation,
     turnAround,
     walkToAnchorX,
     crawlToAnchorX,
@@ -72,7 +73,7 @@ function CompanionWindowInner({ instance, registry }: CompanionWindowInnerProps)
   useCompanionFreezeEvents({ toggleFreeze });
   useCompanionMenuEvents({
     onTurnAround: turnAround,
-    onSit: toggleSit,
+    onPlayAnimation: playMenuAnimation,
     onToggleFreeze: toggleFreeze,
     onUnfreeze: unfreeze,
   });
@@ -90,7 +91,7 @@ function CompanionWindowInner({ instance, registry }: CompanionWindowInnerProps)
     grabbedLeanTier,
     onTick: onWalkTick,
     onClimbTick,
-    onBounceComplete,
+    onAnimationCycleComplete,
   });
 
   useCompanionSpeechWindow({

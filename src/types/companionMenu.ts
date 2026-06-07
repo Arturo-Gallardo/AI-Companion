@@ -1,9 +1,20 @@
+export type CompanionMenuAnimationAction =
+  | "sit"
+  | "sitAlt"
+  | "sitAlt2"
+  | "emote"
+  | "emote2"
+  | "emote3"
+  | "emote4"
+  | "emote5"
+  | "emote6";
+
 export type CompanionMenuAction =
   | "walkTo"
   | "crawlTo"
   | "climbTo"
   | "turnAround"
-  | "sit"
+  | CompanionMenuAnimationAction
   | "toggleFreeze";
 
 export type TargetPickerMode = "walk" | "crawl" | "climb";
@@ -16,6 +27,7 @@ export interface CompanionMenuConfigPayload {
   wallLocked: boolean;
   undersideLocked: boolean;
   frozen: boolean;
+  availableActions: CompanionMenuAnimationAction[];
   targetLabel: string;
 }
 

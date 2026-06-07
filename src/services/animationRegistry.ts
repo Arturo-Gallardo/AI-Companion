@@ -21,6 +21,7 @@ import {
   type CharacterManifest,
 } from "../types/character";
 import type { SurfaceLock } from "../types/companion";
+import type { CompanionMenuAnimationAction } from "../types/companionMenu";
 import { characterDirPath } from "./fs/appPaths";
 import { joinPath, toAssetUrl } from "./fs/fileSystemAdapter";
 
@@ -45,6 +46,7 @@ export interface AnimationRegistry {
   getGrabbedLeanFrame: (tier: GrabbedLeanTier) => string;
   // picks a floor sit variant among assigned sit / sitAlt / sitAlt2 slots
   pickFloorSitAction: () => CompanionAction;
+  contextMenuActions: readonly CompanionMenuAnimationAction[];
 }
 
 const FLOOR_SIT_ACTIONS: readonly CompanionAction[] = [
@@ -75,7 +77,25 @@ const ACTION_TO_CATEGORY: Record<CompanionAction, AnimationCategory> = {
   climbWallDown: "climbWall",
   grabCeiling: "grabCeiling",
   climbCeiling: "climbCeiling",
+  emote: "emote",
+  emote2: "emote2",
+  emote3: "emote3",
+  emote4: "emote4",
+  emote5: "emote5",
+  emote6: "emote6",
 };
+
+const CONTEXT_MENU_ACTIONS: readonly CompanionMenuAnimationAction[] = [
+  "sit",
+  "sitAlt",
+  "sitAlt2",
+  "emote",
+  "emote2",
+  "emote3",
+  "emote4",
+  "emote5",
+  "emote6",
+];
 
 const LEAN_TIER_TO_CATEGORY: Record<GrabbedLeanTier, AnimationCategory> = {
   lightLeft: "dragLightLeft",
@@ -287,6 +307,12 @@ async function buildImportedRegistry(
     return available[Math.floor(Math.random() * available.length)];
   };
 
+  const contextMenuActions = CONTEXT_MENU_ACTIONS.filter(
+    (action) =>
+      (manifest.animations[ACTION_TO_CATEGORY[action]]?.frames.length ?? 0) >
+      0,
+  );
+
   const resolveImportedDisplayAction = (
     action: CompanionAction,
     lock: SurfaceLock | null,
@@ -333,6 +359,7 @@ async function buildImportedRegistry(
     resolveDisplayAction: resolveImportedDisplayAction,
     getGrabbedLeanFrame,
     pickFloorSitAction,
+    contextMenuActions,
   };
 }
 

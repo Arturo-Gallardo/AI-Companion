@@ -13,12 +13,16 @@ pub struct CompanionMenuConfigPayload {
     pub wall_locked: bool,
     pub underside_locked: bool,
     pub frozen: bool,
+    pub available_actions: Vec<String>,
     // the companion window the menu should route its actions back to
     pub target_label: String,
 }
 
 const MENU_WIDTH: f64 = 152.0;
-const MENU_HEIGHT: f64 = 154.0;
+const DEFAULT_MENU_HEIGHT: f64 = 154.0;
+const MAX_MENU_HEIGHT: f64 = 420.0;
+const MENU_ITEM_HEIGHT: f64 = 36.0;
+const MENU_VERTICAL_PADDING: f64 = 10.0;
 
 fn monitor_at_point<'a>(
     x: f64,
@@ -39,7 +43,11 @@ fn monitor_at_point<'a>(
     monitors.first()
 }
 
-fn clamp_menu_position(screen_x: f64, screen_y: f64) -> Result<(i32, i32), String> {
+fn clamp_menu_position(
+    screen_x: f64,
+    screen_y: f64,
+    menu_height: f64,
+) -> Result<(i32, i32), String> {
     let bounds = query_desktop_bounds()?;
     let monitor = monitor_at_point(screen_x, screen_y, &bounds.monitors)
         .ok_or_else(|| "no monitors found".to_string())?;
@@ -53,12 +61,12 @@ fn clamp_menu_position(screen_x: f64, screen_y: f64) -> Result<(i32, i32), Strin
     let mut y = screen_y;
 
     // open above the cursor when the menu would clip off the bottom
-    if y + MENU_HEIGHT > mon_bottom {
-        y = screen_y - MENU_HEIGHT;
+    if y + menu_height > mon_bottom {
+        y = screen_y - menu_height;
     }
 
     x = x.clamp(mon_left, (mon_right - MENU_WIDTH).max(mon_left));
-    y = y.clamp(mon_top, (mon_bottom - MENU_HEIGHT).max(mon_top));
+    y = y.clamp(mon_top, (mon_bottom - menu_height).max(mon_top));
 
     Ok((x.round() as i32, y.round() as i32))
 }
@@ -70,7 +78,7 @@ pub fn create_companion_menu_window(app: &AppHandle) -> Result<(), String> {
 
     let menu_window = WebviewWindowBuilder::new(app, MENU_WINDOW_LABEL, WebviewUrl::default())
         .title("Companion Menu")
-        .inner_size(MENU_WIDTH, MENU_HEIGHT)
+        .inner_size(MENU_WIDTH, DEFAULT_MENU_HEIGHT)
         .decorations(false)
         .transparent(true)
         .shadow(false)
@@ -98,6 +106,7 @@ pub fn show_companion_menu(
     wall_locked: bool,
     underside_locked: bool,
     frozen: bool,
+    available_actions: Vec<String>,
 ) -> Result<(), String> {
     let app = caller.app_handle();
     let target_label = caller.label().to_string();
@@ -106,7 +115,15 @@ pub fn show_companion_menu(
         .get_webview_window(MENU_WINDOW_LABEL)
         .ok_or_else(|| "companion menu window not found".to_string())?;
 
-    let (window_x, window_y) = clamp_menu_position(screen_x, screen_y)?;
+    let animation_item_count = if wall_locked || underside_locked {
+        0
+    } else {
+        available_actions.len()
+    };
+    let item_count = 3 + animation_item_count;
+    let menu_height =
+        (MENU_VERTICAL_PADDING + item_count as f64 * MENU_ITEM_HEIGHT).min(MAX_MENU_HEIGHT);
+    let (window_x, window_y) = clamp_menu_position(screen_x, screen_y, menu_height)?;
 
     window
         .emit(
@@ -115,13 +132,14 @@ pub fn show_companion_menu(
                 wall_locked,
                 underside_locked,
                 frozen,
+                available_actions,
                 target_label,
             },
         )
         .map_err(|error| format!("failed to emit companion menu config: {error}"))?;
 
     window
-        .set_size(tauri::LogicalSize::new(MENU_WIDTH, MENU_HEIGHT))
+        .set_size(tauri::LogicalSize::new(MENU_WIDTH, menu_height))
         .map_err(|error| format!("failed to resize companion menu window: {error}"))?;
 
     window

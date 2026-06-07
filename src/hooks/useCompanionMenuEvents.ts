@@ -2,10 +2,11 @@ import { useEffect } from "react";
 import { listenCompanionMenuAction } from "../services/companionMenuApi";
 import { showTargetPicker } from "../services/companionWalkPickerApi";
 import type { CompanionMenuAction } from "../types/companionMenu";
+import type { CompanionMenuAnimationAction } from "../types/companionMenu";
 
 interface UseCompanionMenuEventsOptions {
   onTurnAround: () => void;
-  onSit: () => void;
+  onPlayAnimation: (action: CompanionMenuAnimationAction) => void;
   onToggleFreeze: () => void;
   onUnfreeze: () => void;
 }
@@ -31,7 +32,15 @@ function handleMenuAction(
       handlers.onTurnAround();
       break;
     case "sit":
-      handlers.onSit();
+    case "sitAlt":
+    case "sitAlt2":
+    case "emote":
+    case "emote2":
+    case "emote3":
+    case "emote4":
+    case "emote5":
+    case "emote6":
+      handlers.onPlayAnimation(action);
       break;
     case "toggleFreeze":
       handlers.onToggleFreeze();
@@ -56,5 +65,10 @@ export function useCompanionMenuEvents(
     return () => {
       unlisten?.();
     };
-  }, [handlers.onSit, handlers.onToggleFreeze, handlers.onTurnAround, handlers.onUnfreeze]);
+  }, [
+    handlers.onPlayAnimation,
+    handlers.onToggleFreeze,
+    handlers.onTurnAround,
+    handlers.onUnfreeze,
+  ]);
 }

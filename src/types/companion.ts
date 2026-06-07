@@ -71,6 +71,7 @@ export type CompanionBehaviorState =
   | "dragging"
   | "falling"
   | "bouncing"
+  | "emoting"
   | "dialoguing";
 
 // gap between sprite top and speech window bottom
