@@ -4,6 +4,7 @@ import type {
   ScreenPosition,
   WindowBottomHit,
   WindowSurface,
+  WindowSnapHit,
   WindowWallHit,
   WorkArea,
 } from "../types/companion";
@@ -81,4 +82,16 @@ export async function hitWindowBottomAt(
   y: number,
 ): Promise<WindowBottomHit | null> {
   return invoke<WindowBottomHit | null>("hit_window_bottom_at", { x, y });
+}
+
+export async function hitWindowSurfaceAt(
+  x: number,
+  y: number,
+  undersideY: number,
+): Promise<WindowSnapHit | null> {
+  return invoke<WindowSnapHit | null>("hit_window_surface_at", {
+    x,
+    y,
+    undersideY,
+  });
 }

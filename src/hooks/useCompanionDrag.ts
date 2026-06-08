@@ -203,9 +203,9 @@ export function useCompanionDrag({
 
       updateLeanFromVelocity(velocityX);
       void setAnchorPosition(nextPosition, "walls");
-      onDragMoveRef.current?.(nextPosition);
+      onDragMoveRef.current?.(getAnchorPosition());
     },
-    [setAnchorPosition, updateLeanFromVelocity],
+    [getAnchorPosition, setAnchorPosition, updateLeanFromVelocity],
   );
 
   useEffect(() => {
@@ -229,6 +229,8 @@ export function useCompanionDrag({
 
       event.preventDefault();
 
+      onDragStartRef.current();
+
       const anchor = getAnchorPosition();
       dragOffsetRef.current = {
         x: anchor.x - event.screenX,
@@ -243,7 +245,7 @@ export function useCompanionDrag({
 
       setIsDragging(true);
       resetLeanState();
-      onDragStartRef.current();
+      onDragMoveRef.current?.(anchor);
 
       captureElementRef.current = event.currentTarget;
       event.currentTarget.setPointerCapture(event.pointerId);

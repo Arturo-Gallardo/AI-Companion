@@ -3,9 +3,7 @@ import type { RefObject } from "react";
 import type { AnimationRegistry } from "../services/animationRegistry";
 import {
   getDesktopBounds,
-  hitTitleBarAt,
-  hitWindowBottomAt,
-  hitWindowWallAt,
+  hitWindowSurfaceAt,
   setCompanionPosition,
 } from "../services/companionApi";
 import type {
@@ -38,12 +36,8 @@ import {
   isUndersideLock,
   isWallLock,
   resolveFloorYAt,
-  surfaceLockFromTitleBar,
-  surfaceLockFromUnderside,
   surfaceLockFromWall,
   toLockedSurfaceSnapshot,
-  windowSurfaceFromBottomHit,
-  windowSurfaceFromWallHit,
   type LockedSurfaceSnapshot,
 } from "../utils/windowSurfaces";
 import { useCompanionWindowSurfaces } from "./useCompanionWindowSurfaces";
@@ -79,8 +73,14 @@ interface UseCompanionMovementResult {
   getAnchorPosition: () => ScreenPosition;
   getHorizontalWalkRange: () => { minX: number; maxX: number } | null;
   getVerticalClimbRange: () => { minY: number; maxY: number } | null;
-  clearSurfaceLock: () => void;
+  releaseSurfaceLockForDrag: () => void;
+  canLockSurfaceAt: (x: number, y: number) => Promise<boolean>;
   tryLockSurfaceAt: (x: number, y: number) => Promise<SurfaceLock | null>;
+}
+
+interface SurfaceLockCandidate {
+  lock: SurfaceLock;
+  surface: WindowSurface;
 }
 
 export function useCompanionMovement(
@@ -128,6 +128,9 @@ export function useCompanionMovement(
   }, [registry, scale]);
 
   const anchorXOffset = (registry.spriteWidth / 2) * scale;
+  const undersideProbeYOffset =
+    (registry.getSpriteAnchor("idle").y - registry.spriteHeight / 2) *
+    scale;
 
   useEffect(() => {
     desktopBoundsRef.current = desktopBounds;
@@ -315,54 +318,58 @@ export function useCompanionMovement(
     setSurfaceLock(null);
   }, []);
 
-  const tryLockSurfaceAt = useCallback(
-    async (x: number, y: number): Promise<SurfaceLock | null> => {
+  const releaseSurfaceLockForDrag = useCallback(() => {
+    const lock = surfaceLockRef.current;
+    const current = anchorRef.current;
+
+    clearSurfaceLock();
+
+    if (!lock || !isUndersideLock(lock.kind)) {
+      return;
+    }
+
+    const nextPosition = {
+      x: current.x,
+      y:
+        current.y +
+        (registry.getSpriteAnchor("idle").y -
+          registry.getSpriteAnchor("grabCeiling").y) *
+          scale,
+    };
+
+    anchorRef.current = nextPosition;
+    setAnchorYState(nextPosition.y);
+    void setCompanionPosition(
+      nextPosition,
+      registry.getSpriteAnchor("idle").y * scale,
+      anchorXOffset,
+    );
+  }, [anchorXOffset, clearSurfaceLock, registry, scale]);
+
+  const findSurfaceLockAt = useCallback(
+    async (x: number, y: number): Promise<SurfaceLockCandidate | null> => {
       try {
-        const titleBar = await hitTitleBarAt(x, y);
-        if (titleBar) {
-          const lock = surfaceLockFromTitleBar(titleBar.hwnd);
-          lockedSurfaceCacheRef.current = titleBar;
-          surfaceLockRef.current = lock;
-          lockedSurfaceSnapshotRef.current = toLockedSurfaceSnapshot(titleBar);
-          setSurfaceLock(lock);
-          return lock;
-        }
+        const hit = await hitWindowSurfaceAt(
+          x,
+          y,
+          y - undersideProbeYOffset,
+        );
 
-        const wall = await hitWindowWallAt(x, y);
-        if (wall) {
-          const wallSurface = windowSurfaceFromWallHit(wall);
-          const lock = surfaceLockFromWall(wall);
-          lockedSurfaceCacheRef.current = wallSurface;
-          surfaceLockRef.current = lock;
-          lockedSurfaceSnapshotRef.current = toLockedSurfaceSnapshot(wallSurface);
-          setSurfaceLock(lock);
-          return lock;
-        }
-
-        const bottom = await hitWindowBottomAt(x, y);
-        if (bottom) {
-          const bottomSurface = windowSurfaceFromBottomHit(bottom);
-          const lock = surfaceLockFromUnderside(bottom);
-          lockedSurfaceCacheRef.current = bottomSurface;
-          surfaceLockRef.current = lock;
-          lockedSurfaceSnapshotRef.current =
-            toLockedSurfaceSnapshot(bottomSurface);
-          setSurfaceLock(lock);
-          return lock;
+        if (hit) {
+          return {
+            lock: { hwnd: hit.surface.hwnd, kind: hit.kind },
+            surface: hit.surface,
+          };
         }
 
         const bounds = desktopBoundsRef.current;
         if (bounds) {
           const screenEdge = hitScreenEdgeWallAt(x, y, bounds);
           if (screenEdge) {
-            const edgeSurface = screenEdgeSurfaceFromWallHit(screenEdge);
-            const lock = surfaceLockFromWall(screenEdge);
-            lockedSurfaceCacheRef.current = edgeSurface;
-            surfaceLockRef.current = lock;
-            lockedSurfaceSnapshotRef.current =
-              toLockedSurfaceSnapshot(edgeSurface);
-            setSurfaceLock(lock);
-            return lock;
+            return {
+              lock: surfaceLockFromWall(screenEdge),
+              surface: screenEdgeSurfaceFromWallHit(screenEdge),
+            };
           }
         }
 
@@ -371,7 +378,32 @@ export function useCompanionMovement(
         return null;
       }
     },
-    [],
+    [undersideProbeYOffset],
+  );
+
+  const canLockSurfaceAt = useCallback(
+    async (x: number, y: number): Promise<boolean> => {
+      return (await findSurfaceLockAt(x, y)) !== null;
+    },
+    [findSurfaceLockAt],
+  );
+
+  const tryLockSurfaceAt = useCallback(
+    async (x: number, y: number): Promise<SurfaceLock | null> => {
+      const candidate = await findSurfaceLockAt(x, y);
+      if (!candidate) {
+        return null;
+      }
+
+      lockedSurfaceCacheRef.current = candidate.surface;
+      surfaceLockRef.current = candidate.lock;
+      lockedSurfaceSnapshotRef.current = toLockedSurfaceSnapshot(
+        candidate.surface,
+      );
+      setSurfaceLock(candidate.lock);
+      return candidate.lock;
+    },
+    [findSurfaceLockAt],
   );
 
   useEffect(() => {
@@ -568,7 +600,8 @@ export function useCompanionMovement(
     getAnchorPosition,
     getHorizontalWalkRange,
     getVerticalClimbRange,
-    clearSurfaceLock,
+    releaseSurfaceLockForDrag,
+    canLockSurfaceAt,
     tryLockSurfaceAt,
   };
 }

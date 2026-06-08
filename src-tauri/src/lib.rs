@@ -8,10 +8,10 @@ use companion::{
     create_companion_speech_instance_window, create_walk_picker_window,
     destroy_companion_instance_window, get_desktop_bounds, get_window_surfaces, get_work_area,
     hide_companion_menu, hide_companion_speech, hide_walk_picker, hit_title_bar_at,
-    hit_window_bottom_at, hit_window_wall_at, register_excluded_hwnds_from_app,
-    set_companion_position, set_companion_speech_size, set_companion_window_size,
-    show_companion_menu, show_companion_speech, show_walk_picker, submit_target_picker,
-    take_companion_speech_content,
+    hit_window_bottom_at, hit_window_surface_at, hit_window_wall_at,
+    register_excluded_hwnds_from_app, set_companion_position, set_companion_speech_size,
+    set_companion_window_size, show_companion_menu, show_companion_speech, show_walk_picker,
+    submit_target_picker, take_companion_speech_content,
 };
 use data_folder::{get_characters_folder_fingerprint, open_characters_folder};
 use main_window::{configure_main_window, handle_window_event};
@@ -42,6 +42,7 @@ pub fn run() {
             hit_title_bar_at,
             hit_window_wall_at,
             hit_window_bottom_at,
+            hit_window_surface_at,
             set_companion_position,
             set_companion_window_size,
             create_companion_instance_window,

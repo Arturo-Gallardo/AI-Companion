@@ -14,11 +14,13 @@ import {
 import {
   copyFile,
   ensureDir,
+  getBasename,
   joinPath,
   listDirectory,
   pathExists,
   pickDirectory,
   removePath,
+  renamePath,
   toAssetUrl,
   writeJson,
 } from "./fs/fileSystemAdapter";
@@ -50,6 +52,8 @@ async function listCharacterSpriteSources(
     return [];
   }
 
+  const sourceDir = await joinPath(spritesDir, "source");
+  const searchDir = (await pathExists(sourceDir)) ? sourceDir : spritesDir;
   const sources: ShimejiSourceFrame[] = [];
 
   async function walk(dir: string): Promise<void> {
@@ -72,7 +76,7 @@ async function listCharacterSpriteSources(
     }
   }
 
-  await walk(spritesDir);
+  await walk(searchDir);
 
   return sources.sort((a, b) =>
     a.path.localeCompare(b.path, undefined, { numeric: true }),
@@ -81,6 +85,7 @@ async function listCharacterSpriteSources(
 
 function buildAnimations(
   draft: ShimejiDraft,
+  sourcePathByInput: ReadonlyMap<string, string>,
 ): Partial<Record<AnimationCategory, AnimationDefinition>> {
   const animations: Partial<Record<AnimationCategory, AnimationDefinition>> = {};
 
@@ -94,8 +99,9 @@ function buildAnimations(
 
     animations[category] = {
       fps: assignment.fps,
-      frames: assignment.frames.map((_, index) => ({
+      frames: assignment.frames.map((source, index) => ({
         src: `sprites/${category}/${index}.png`,
+        source: sourcePathByInput.get(source),
       })),
     };
   }
@@ -106,27 +112,77 @@ function buildAnimations(
 async function writeDraftSprites(
   characterId: string,
   draft: ShimejiDraft,
-): Promise<void> {
+): Promise<Map<string, string>> {
   const destDir = await characterDirPath(characterId);
+  const spritesDir = await characterSpritesDirPath(characterId);
+  const stagingDir = `${spritesDir}.${crypto.randomUUID()}.tmp`;
+  const backupDir = `${spritesDir}.${crypto.randomUUID()}.bak`;
+
   await ensureDir(destDir);
-  await removePath(await characterSpritesDirPath(characterId));
 
-  for (const [category, assignment] of Object.entries(draft.assignments) as [
-    AnimationCategory,
-    ShimejiDraft["assignments"][AnimationCategory],
-  ][]) {
-    if (assignment.frames.length === 0) {
-      continue;
-    }
+  try {
+    const sourcePaths = [
+      ...draft.sources.map((source) => source.path),
+      ...Object.values(draft.assignments).flatMap(
+        (assignment) => assignment.frames,
+      ),
+    ].filter((path, index, paths) => paths.indexOf(path) === index);
+    const sourcePathByInput = new Map<string, string>();
+    const usedSourceFilenames = new Set<string>();
+    const sourceDir = await joinPath(stagingDir, "source");
+    await ensureDir(sourceDir);
 
-    const categoryDir = await joinPath(destDir, "sprites", category);
-    await ensureDir(categoryDir);
-
-    for (let index = 0; index < assignment.frames.length; index += 1) {
-      const source = assignment.frames[index];
-      const dest = await joinPath(categoryDir, `${index}.png`);
+    for (let index = 0; index < sourcePaths.length; index += 1) {
+      const source = sourcePaths[index];
+      const basename = await getBasename(source);
+      let filename = basename;
+      let suffix = index;
+      while (usedSourceFilenames.has(filename)) {
+        filename = `${suffix.toString().padStart(4, "0")}-${basename}`;
+        suffix += 1;
+      }
+      usedSourceFilenames.add(filename);
+      const dest = await joinPath(sourceDir, filename);
       await copyFile(source, dest);
+      sourcePathByInput.set(source, `sprites/source/${filename}`);
     }
+
+    for (const [category, assignment] of Object.entries(draft.assignments) as [
+      AnimationCategory,
+      ShimejiDraft["assignments"][AnimationCategory],
+    ][]) {
+      if (assignment.frames.length === 0) {
+        continue;
+      }
+
+      const categoryDir = await joinPath(stagingDir, category);
+      await ensureDir(categoryDir);
+
+      for (let index = 0; index < assignment.frames.length; index += 1) {
+        const source = assignment.frames[index];
+        const dest = await joinPath(categoryDir, `${index}.png`);
+        await copyFile(source, dest);
+      }
+    }
+
+    if (await pathExists(spritesDir)) {
+      await renamePath(spritesDir, backupDir);
+    }
+
+    await renamePath(stagingDir, spritesDir);
+    await removePath(backupDir);
+    return sourcePathByInput;
+  } catch (error) {
+    await removePath(stagingDir);
+
+    if (
+      (await pathExists(backupDir)) &&
+      !(await pathExists(spritesDir))
+    ) {
+      await renamePath(backupDir, spritesDir);
+    }
+
+    throw error;
   }
 }
 
@@ -158,7 +214,7 @@ export async function loadCharacterDraft(
 
     const frames: string[] = [];
     for (const frame of definition.frames) {
-      frames.push(await joinPath(characterDir, frame.src));
+      frames.push(await joinPath(characterDir, frame.source ?? frame.src));
     }
 
     assignments[category] = {
@@ -192,13 +248,13 @@ export async function saveCharacterDraft(
     throw new Error("character not found");
   }
 
-  await writeDraftSprites(characterId, draft);
+  const sourcePathByInput = await writeDraftSprites(characterId, draft);
 
   const manifest: CharacterManifest = {
     ...entry.manifest,
     frameWidth: draft.frameWidth,
     frameHeight: draft.frameHeight,
-    animations: buildAnimations(draft),
+    animations: buildAnimations(draft, sourcePathByInput),
   };
 
   await writeJson(await characterManifestPath(characterId), manifest);
@@ -215,7 +271,7 @@ export async function convertShimejiDraft(
   const id = await allocateNewTomojiFolderName(name);
   const destDir = await characterDirPath(id);
   await ensureDir(destDir);
-  await writeDraftSprites(id, draft);
+  const sourcePathByInput = await writeDraftSprites(id, draft);
 
   const manifest: CharacterManifest = {
     id,
@@ -226,7 +282,7 @@ export async function convertShimejiDraft(
     defaultSpeed: draft.speed,
     frameWidth: draft.frameWidth,
     frameHeight: draft.frameHeight,
-    animations: buildAnimations(draft),
+    animations: buildAnimations(draft, sourcePathByInput),
     behaviorSettings: draft.behavior,
     dialogueSettings: {
       lines: draft.dialogueLines,

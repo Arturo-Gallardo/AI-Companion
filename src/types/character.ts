@@ -4,6 +4,8 @@ import type { Velocity } from "../animations/types";
 // for imported characters (e.g. "sprites/walk/0.png") or a resolvable url.
 export interface AnimationFrame {
   src: string;
+  // editable source-library frame used to regenerate assigned animation files
+  source?: string;
   // optional per-frame hold in engine ticks (25ms each); overrides fps when set
   durationTicks?: number;
 }

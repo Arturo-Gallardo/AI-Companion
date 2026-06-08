@@ -156,6 +156,24 @@ function actionVelocity(
   }
 }
 
+function resolveActionVelocity(
+  action: CompanionAction,
+  configured: { x: number; y: number } | undefined,
+  speed: number,
+): { x: number; y: number } {
+  const velocity = configured ?? actionVelocity(action, speed);
+
+  if (action === "climbWall") {
+    return { x: velocity.x, y: -Math.abs(velocity.y) };
+  }
+
+  if (action === "climbWallDown") {
+    return { x: velocity.x, y: Math.abs(velocity.y) };
+  }
+
+  return velocity;
+}
+
 function importedSpriteAnchor(
   action: CompanionAction,
   width: number,
@@ -288,7 +306,7 @@ async function buildImportedRegistry(
       frames: resolvedFrames,
       tickDuration: data?.tickDuration ?? 6,
       frameTickDurations: data?.frameTickDurations,
-      velocity: definition?.velocity ?? actionVelocity(action, speed),
+      velocity: resolveActionVelocity(action, definition?.velocity, speed),
     };
   };
 

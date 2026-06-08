@@ -52,6 +52,17 @@ export interface WindowBottomHit {
   bottom: number;
 }
 
+export type WindowSnapKind =
+  | "titleBar"
+  | "wallLeft"
+  | "wallRight"
+  | "underside";
+
+export interface WindowSnapHit {
+  kind: WindowSnapKind;
+  surface: WindowSurface;
+}
+
 export type SurfaceLockKind =
   | "titleBar"
   | "wallLeft"

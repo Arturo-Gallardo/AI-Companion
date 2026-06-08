@@ -21,8 +21,8 @@ pub use walk_picker::{
     submit_target_picker,
 };
 pub use window_surfaces::{
-    get_window_surfaces, hit_title_bar_at, hit_window_bottom_at, hit_window_wall_at,
-    register_excluded_hwnd, register_excluded_hwnds_from_app,
+    get_window_surfaces, hit_title_bar_at, hit_window_bottom_at, hit_window_surface_at,
+    hit_window_wall_at, register_excluded_hwnd, register_excluded_hwnds_from_app,
 };
 
 pub const SPRITE_WIDTH: f64 = 128.0;

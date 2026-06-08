@@ -42,6 +42,22 @@ pub struct WindowBottomHit {
     pub bottom: i32,
 }
 
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WindowSnapKind {
+    TitleBar,
+    WallLeft,
+    WallRight,
+    Underside,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowSnapHit {
+    pub kind: WindowSnapKind,
+    pub surface: WindowSurface,
+}
+
 static EXCLUDED_HWNDS: LazyLock<Mutex<HashSet<isize>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
 
@@ -241,12 +257,37 @@ fn distance_to_title_band(surface: &WindowSurface, y: i32) -> i32 {
 }
 
 #[cfg(windows)]
+fn surface_point_is_visible(
+    surfaces: &[WindowSurface],
+    surface_index: usize,
+    x: i32,
+    y: i32,
+) -> bool {
+    // EnumWindows returns top-level windows in top-to-bottom z-order.
+    !surfaces[..surface_index].iter().any(|covering| {
+        x >= covering.left
+            && x < covering.right
+            && y >= covering.top
+            && y < covering.bottom
+    })
+}
+
+#[cfg(windows)]
 fn find_nearby_title_bar(surfaces: &[WindowSurface], x: f64, y: f64) -> Option<WindowSurface> {
     surfaces
         .iter()
-        .filter(|surface| point_hits_surface(surface, x, y))
-        .min_by_key(|surface| distance_to_title_band(surface, y.round() as i32))
-        .cloned()
+        .enumerate()
+        .filter(|(surface_index, surface)| {
+            if !point_hits_surface(surface, x, y) {
+                return false;
+            }
+
+            let probe_x = (x.round() as i32).clamp(surface.left, surface.right.saturating_sub(1));
+            let probe_y = (y.round() as i32).clamp(surface.top, surface.title_bar_bottom);
+            surface_point_is_visible(surfaces, *surface_index, probe_x, probe_y)
+        })
+        .min_by_key(|(_, surface)| distance_to_title_band(surface, y.round() as i32))
+        .map(|(_, surface)| surface.clone())
 }
 
 #[cfg(windows)]
@@ -292,24 +333,7 @@ pub fn query_window_surfaces() -> Result<Vec<WindowSurface>, String> {
 
 #[cfg(windows)]
 pub fn query_hit_title_bar_at(x: f64, y: f64) -> Result<Option<WindowSurface>, String> {
-    use windows::Win32::Foundation::POINT;
-    use windows::Win32::UI::WindowsAndMessaging::WindowFromPoint;
-
     let surfaces = query_window_surfaces()?;
-    let point = POINT {
-        x: x.round() as i32,
-        y: y.round() as i32,
-    };
-
-    unsafe {
-        let hwnd = WindowFromPoint(point);
-        if let Some(surface) = surface_from_hwnd(hwnd) {
-            if point_hits_surface(&surface, x, y) {
-                return Ok(Some(surface));
-            }
-        }
-    }
-
     Ok(find_nearby_title_bar(&surfaces, x, y))
 }
 
@@ -366,13 +390,32 @@ fn wall_hit_from_surface(surface: &WindowSurface, side: WindowWallSide) -> Windo
 }
 
 #[cfg(windows)]
+fn wall_side_is_visible(
+    surfaces: &[WindowSurface],
+    surface_index: usize,
+    side: WindowWallSide,
+    y: f64,
+) -> bool {
+    let surface = &surfaces[surface_index];
+    let probe_x = match side {
+        WindowWallSide::Left => surface.left,
+        WindowWallSide::Right => surface.right.saturating_sub(1),
+    };
+    let probe_y = (y.round() as i32).clamp(surface.top, surface.bottom.saturating_sub(1));
+
+    surface_point_is_visible(surfaces, surface_index, probe_x, probe_y)
+}
+
+#[cfg(windows)]
 fn find_nearby_window_wall(surfaces: &[WindowSurface], x: f64, y: f64) -> Option<WindowWallHit> {
     let x_i = x.round() as i32;
 
     let mut best: Option<(WindowWallHit, i32)> = None;
 
-    for surface in surfaces {
-        if point_hits_left_wall(surface, x, y) {
+    for (surface_index, surface) in surfaces.iter().enumerate() {
+        if point_hits_left_wall(surface, x, y)
+            && wall_side_is_visible(surfaces, surface_index, WindowWallSide::Left, y)
+        {
             let distance = distance_to_vertical_edge(surface, WindowWallSide::Left, x_i);
             let hit = wall_hit_from_surface(surface, WindowWallSide::Left);
             if best.as_ref().map(|(_, d)| distance < *d).unwrap_or(true) {
@@ -380,7 +423,9 @@ fn find_nearby_window_wall(surfaces: &[WindowSurface], x: f64, y: f64) -> Option
             }
         }
 
-        if point_hits_right_wall(surface, x, y) {
+        if point_hits_right_wall(surface, x, y)
+            && wall_side_is_visible(surfaces, surface_index, WindowWallSide::Right, y)
+        {
             let distance = distance_to_vertical_edge(surface, WindowWallSide::Right, x_i);
             let hit = wall_hit_from_surface(surface, WindowWallSide::Right);
             if best.as_ref().map(|(_, d)| distance < *d).unwrap_or(true) {
@@ -394,28 +439,7 @@ fn find_nearby_window_wall(surfaces: &[WindowSurface], x: f64, y: f64) -> Option
 
 #[cfg(windows)]
 pub fn query_hit_window_wall_at(x: f64, y: f64) -> Result<Option<WindowWallHit>, String> {
-    use windows::Win32::Foundation::POINT;
-    use windows::Win32::UI::WindowsAndMessaging::WindowFromPoint;
-
     let surfaces = query_window_surfaces()?;
-    let point = POINT {
-        x: x.round() as i32,
-        y: y.round() as i32,
-    };
-
-    unsafe {
-        let hwnd = WindowFromPoint(point);
-        if let Some(surface) = surface_from_hwnd(hwnd) {
-            if point_hits_left_wall(&surface, x, y) {
-                return Ok(Some(wall_hit_from_surface(&surface, WindowWallSide::Left)));
-            }
-
-            if point_hits_right_wall(&surface, x, y) {
-                return Ok(Some(wall_hit_from_surface(&surface, WindowWallSide::Right)));
-            }
-        }
-    }
-
     Ok(find_nearby_window_wall(&surfaces, x, y))
 }
 
@@ -589,10 +613,6 @@ fn max_bottom_hit_y(surface: &WindowSurface, x: f64) -> i32 {
         max_y = max_y.min(info.rcWork.bottom - 1);
     }
 
-    if let Some(max_anchor) = max_bottom_crawl_anchor_y(surface) {
-        max_y = max_y.min(max_anchor + BOTTOM_HIT_TOLERANCE_ABOVE);
-    }
-
     max_y
 }
 
@@ -632,8 +652,14 @@ fn bottom_hit_from_surface(surface: &WindowSurface) -> WindowBottomHit {
 fn find_nearby_window_bottom(surfaces: &[WindowSurface], x: f64, y: f64) -> Option<WindowBottomHit> {
     let mut best: Option<(WindowBottomHit, i32)> = None;
 
-    for surface in surfaces {
+    for (surface_index, surface) in surfaces.iter().enumerate() {
         if !point_hits_window_bottom(surface, x, y) {
+            continue;
+        }
+
+        let probe_x = (x.round() as i32).clamp(surface.left, surface.right.saturating_sub(1));
+        let probe_y = surface.bottom.saturating_sub(1);
+        if !surface_point_is_visible(surfaces, surface_index, probe_x, probe_y) {
             continue;
         }
 
@@ -650,25 +676,52 @@ fn find_nearby_window_bottom(surfaces: &[WindowSurface], x: f64, y: f64) -> Opti
 
 #[cfg(windows)]
 pub fn query_hit_window_bottom_at(x: f64, y: f64) -> Result<Option<WindowBottomHit>, String> {
-    use windows::Win32::Foundation::POINT;
-    use windows::Win32::UI::WindowsAndMessaging::WindowFromPoint;
-
     let surfaces = query_window_surfaces()?;
-    let point = POINT {
-        x: x.round() as i32,
-        y: y.round() as i32,
-    };
+    Ok(find_nearby_window_bottom(&surfaces, x, y))
+}
 
-    unsafe {
-        let hwnd = WindowFromPoint(point);
-        if let Some(surface) = surface_from_hwnd(hwnd) {
-            if surface_allows_bottom_crawl(&surface) && point_hits_window_bottom(&surface, x, y) {
-                return Ok(Some(bottom_hit_from_surface(&surface)));
-            }
-        }
+#[cfg(windows)]
+pub fn query_hit_window_surface_at(
+    x: f64,
+    y: f64,
+    underside_y: f64,
+) -> Result<Option<WindowSnapHit>, String> {
+    let surfaces = query_window_surfaces()?;
+
+    if let Some(surface) = find_nearby_title_bar(&surfaces, x, y) {
+        return Ok(Some(WindowSnapHit {
+            kind: WindowSnapKind::TitleBar,
+            surface,
+        }));
     }
 
-    Ok(find_nearby_window_bottom(&surfaces, x, y))
+    if let Some(wall) = find_nearby_window_wall(&surfaces, x, y) {
+        let Some(surface) = surfaces.iter().find(|surface| surface.hwnd == wall.hwnd) else {
+            return Ok(None);
+        };
+        let kind = match wall.side {
+            WindowWallSide::Left => WindowSnapKind::WallLeft,
+            WindowWallSide::Right => WindowSnapKind::WallRight,
+        };
+
+        return Ok(Some(WindowSnapHit {
+            kind,
+            surface: surface.clone(),
+        }));
+    }
+
+    if let Some(bottom) = find_nearby_window_bottom(&surfaces, x, underside_y) {
+        let Some(surface) = surfaces.iter().find(|surface| surface.hwnd == bottom.hwnd) else {
+            return Ok(None);
+        };
+
+        return Ok(Some(WindowSnapHit {
+            kind: WindowSnapKind::Underside,
+            surface: surface.clone(),
+        }));
+    }
+
+    Ok(None)
 }
 
 #[cfg(not(windows))]
@@ -683,6 +736,15 @@ pub fn query_hit_window_wall_at(_x: f64, _y: f64) -> Result<Option<WindowWallHit
 
 #[cfg(not(windows))]
 pub fn query_hit_title_bar_at(_x: f64, _y: f64) -> Result<Option<WindowSurface>, String> {
+    Ok(None)
+}
+
+#[cfg(not(windows))]
+pub fn query_hit_window_surface_at(
+    _x: f64,
+    _y: f64,
+    _underside_y: f64,
+) -> Result<Option<WindowSnapHit>, String> {
     Ok(None)
 }
 
@@ -709,4 +771,13 @@ pub fn hit_title_bar_at(x: f64, y: f64) -> Result<Option<WindowSurface>, String>
 #[tauri::command]
 pub fn hit_window_bottom_at(x: f64, y: f64) -> Result<Option<WindowBottomHit>, String> {
     query_hit_window_bottom_at(x, y)
+}
+
+#[tauri::command]
+pub fn hit_window_surface_at(
+    x: f64,
+    y: f64,
+    underside_y: f64,
+) -> Result<Option<WindowSnapHit>, String> {
+    query_hit_window_surface_at(x, y, underside_y)
 }

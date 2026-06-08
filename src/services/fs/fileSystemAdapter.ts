@@ -86,6 +86,10 @@ export async function removePath(path: string): Promise<void> {
   }
 }
 
+export async function renamePath(source: string, dest: string): Promise<void> {
+  await rename(source, dest);
+}
+
 export async function readJson<T>(path: string): Promise<T> {
   const raw = await readTextFile(path);
   return JSON.parse(raw) as T;
