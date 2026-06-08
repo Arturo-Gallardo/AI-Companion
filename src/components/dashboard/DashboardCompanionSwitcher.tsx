@@ -1,5 +1,6 @@
 import { isBuiltinCharacterId } from "../../services/characterLibrary";
 import type { CompanionInstance } from "../../types/companionInstance";
+import { MutedIcon } from "../MutedIcon";
 
 interface DashboardCompanionSwitcherProps {
   instances: CompanionInstance[];
@@ -33,7 +34,7 @@ export function DashboardCompanionSwitcher({
               role="tab"
               aria-selected={isSelected}
               onClick={() => onSelect(instance.id)}
-              className={`shrink-0 rounded-full px-3 py-1 text-sm font-bold transition-colors ${
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold transition-colors ${
                 isSelected
                   ? "bg-white text-black"
                   : "bg-neutral-900 text-neutral-300 hover:bg-neutral-800 hover:text-white"
@@ -42,6 +43,11 @@ export function DashboardCompanionSwitcher({
               {isBuiltinCharacterId(instance.characterId)
                 ? instance.name
                 : instance.characterId}
+              {instance.muted === true ? (
+                <span aria-label="Muted" title="Muted">
+                  <MutedIcon className="h-3.5 w-3.5" />
+                </span>
+              ) : null}
             </button>
           );
         })}

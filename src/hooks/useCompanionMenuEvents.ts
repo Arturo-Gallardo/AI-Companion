@@ -8,6 +8,7 @@ interface UseCompanionMenuEventsOptions {
   onTurnAround: () => void;
   onPlayAnimation: (action: CompanionMenuAnimationAction) => void;
   onToggleFreeze: () => void;
+  onToggleMute: () => void;
   onUnfreeze: () => void;
 }
 
@@ -45,6 +46,9 @@ function handleMenuAction(
     case "toggleFreeze":
       handlers.onToggleFreeze();
       break;
+    case "toggleMute":
+      handlers.onToggleMute();
+      break;
     default:
       break;
   }
@@ -68,6 +72,7 @@ export function useCompanionMenuEvents(
   }, [
     handlers.onPlayAnimation,
     handlers.onToggleFreeze,
+    handlers.onToggleMute,
     handlers.onTurnAround,
     handlers.onUnfreeze,
   ]);

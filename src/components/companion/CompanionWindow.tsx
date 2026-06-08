@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useCompanionAnimation } from "../../hooks/useCompanionAnimation";
 import { useCompanionBackgroundEvents } from "../../hooks/useCompanionBackgroundEvents";
 import { useCompanionBehavior } from "../../hooks/useCompanionBehavior";
@@ -11,6 +12,7 @@ import { useCompanionMirrorBroadcast } from "../../hooks/useCompanionMirrorBroad
 import { useCompanionSpeechWindow } from "../../hooks/useCompanionSpeechWindow";
 import { useCompanionWindowSizeSync } from "../../hooks/useCompanionWindowSizeSync";
 import type { AnimationRegistry } from "../../services/animationRegistry";
+import { updateInstance } from "../../services/companionInstanceManager";
 import type { CompanionInstance } from "../../types/companionInstance";
 import { CompanionSprite } from "./CompanionSprite";
 import { CompanionSurfaceLockIndicator } from "./CompanionSurfaceLockIndicator";
@@ -21,6 +23,10 @@ interface CompanionWindowInnerProps {
 }
 
 function CompanionWindowInner({ instance, registry }: CompanionWindowInnerProps) {
+  const toggleMute = useCallback(() => {
+    void updateInstance(instance.id, { muted: instance.muted !== true });
+  }, [instance.id, instance.muted]);
+
   const {
     displayAction,
     facing,
@@ -75,6 +81,7 @@ function CompanionWindowInner({ instance, registry }: CompanionWindowInnerProps)
     onTurnAround: turnAround,
     onPlayAnimation: playMenuAnimation,
     onToggleFreeze: toggleFreeze,
+    onToggleMute: toggleMute,
     onUnfreeze: unfreeze,
   });
   useCompanionWalkPickerEvents({

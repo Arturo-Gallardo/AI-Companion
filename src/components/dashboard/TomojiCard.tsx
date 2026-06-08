@@ -4,6 +4,7 @@ import type { AnimationRegistry } from "../../services/animationRegistry";
 import { isBuiltinCharacterId } from "../../services/characterLibrary";
 import type { CompanionInstance } from "../../types/companionInstance";
 import { CompanionSprite } from "../companion/CompanionSprite";
+import { MutedIcon } from "../MutedIcon";
 
 const CARD_SPRITE_HEIGHT = 72;
 
@@ -154,15 +155,26 @@ export function TomojiCard({
           {instance.enabled && !isArchived ? "On" : "Off"}
         </button>
 
-        <button
-          type="button"
-          onClick={() => setIsMenuOpen((current) => !current)}
-          className="rounded-full px-1.5 pb-1 text-lg leading-none text-white hover:bg-neutral-800"
-          aria-expanded={isMenuOpen}
-          aria-label={`More options for ${instance.name}`}
-        >
-          ...
-        </button>
+        <div className="flex items-center gap-1">
+          {instance.muted === true ? (
+            <span
+              className="text-neutral-400"
+              aria-label={`${instance.name} is muted`}
+              title="Muted"
+            >
+              <MutedIcon />
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen((current) => !current)}
+            className="rounded-full px-1.5 pb-1 text-lg leading-none text-white hover:bg-neutral-800"
+            aria-expanded={isMenuOpen}
+            aria-label={`More options for ${instance.name}`}
+          >
+            ...
+          </button>
+        </div>
       </div>
 
       <div className="flex h-[72px] items-center justify-center">

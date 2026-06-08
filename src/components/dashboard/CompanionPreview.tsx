@@ -4,6 +4,7 @@ import { useCompanionMirrorState } from "../../hooks/useCompanionMirrorState";
 import type { AnimationRegistry } from "../../services/animationRegistry";
 import type { CompanionInstance } from "../../types/companionInstance";
 import { CompanionSprite } from "../companion/CompanionSprite";
+import { MutedIcon } from "../MutedIcon";
 
 const PREVIEW_SCALE = 3;
 
@@ -33,7 +34,13 @@ function CompanionPreviewInner({
   const previewHeight = registry.spriteHeight * PREVIEW_SCALE;
 
   return (
-    <section className="flex h-full min-h-0 items-center justify-center">
+    <section className="relative flex h-full min-h-0 items-center justify-center">
+      {instance.muted === true ? (
+        <span className="absolute left-6 top-6 flex items-center gap-2 rounded-full border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs font-bold text-neutral-300">
+          <MutedIcon />
+          Muted
+        </span>
+      ) : null}
       <div
         className="flex items-center justify-center"
         style={{ width: previewWidth, height: previewHeight }}

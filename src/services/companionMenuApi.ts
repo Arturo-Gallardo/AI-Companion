@@ -17,6 +17,7 @@ export async function showCompanionMenu(
   wallLocked: boolean,
   undersideLocked: boolean,
   frozen: boolean,
+  muted: boolean,
   availableActions: readonly CompanionMenuAnimationAction[],
 ): Promise<void> {
   await invoke("show_companion_menu", {
@@ -25,6 +26,7 @@ export async function showCompanionMenu(
     wallLocked,
     undersideLocked,
     frozen,
+    muted,
     availableActions,
   });
 }

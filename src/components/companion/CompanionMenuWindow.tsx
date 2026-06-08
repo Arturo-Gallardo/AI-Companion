@@ -27,6 +27,7 @@ export function CompanionMenuWindow() {
   const [wallLocked, setWallLocked] = useState(false);
   const [undersideLocked, setUndersideLocked] = useState(false);
   const [frozen, setFrozen] = useState(false);
+  const [muted, setMuted] = useState(false);
   const [animationsOpen, setAnimationsOpen] = useState(false);
   const [availableActions, setAvailableActions] = useState<
     CompanionMenuAnimationAction[]
@@ -53,12 +54,14 @@ export function CompanionMenuWindow() {
         wallLocked: nextWallLocked,
         undersideLocked: nextUndersideLocked,
         frozen: nextFrozen,
+        muted: nextMuted,
         availableActions: nextAvailableActions = [],
         targetLabel: nextTarget,
       }) => {
         setWallLocked(nextWallLocked);
         setUndersideLocked(nextUndersideLocked);
         setFrozen(nextFrozen);
+        setMuted(nextMuted);
         setAnimationsOpen(false);
         setAvailableActions(nextAvailableActions);
         setTargetLabel(nextTarget);
@@ -99,6 +102,16 @@ export function CompanionMenuWindow() {
 
   return (
     <nav className="flex max-h-full w-full flex-col gap-1 overflow-y-auto rounded-md border border-neutral-600/90 bg-neutral-900/95 p-1.5 shadow-lg">
+      <button
+        type="button"
+        onClick={() => {
+          handleAction("toggleMute");
+        }}
+        className="rounded px-2.5 py-1.5 text-left text-sm text-neutral-100 hover:bg-neutral-700/90"
+      >
+        {muted ? "Unmute" : "Mute"}
+      </button>
+
       <button
         type="button"
         onClick={() => {

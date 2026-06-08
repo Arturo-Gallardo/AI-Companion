@@ -1211,12 +1211,14 @@ export function useCompanionBehavior({
         isWallLocked,
         isUndersideLocked,
         isFrozen,
+        isMuted,
         registry.contextMenuActions,
       );
     },
     [
       canOpenContextMenu,
       isFrozen,
+      isMuted,
       isUndersideLocked,
       isWallLocked,
       registry.contextMenuActions,
