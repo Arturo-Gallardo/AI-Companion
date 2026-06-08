@@ -131,7 +131,7 @@ pub fn show_companion_menu(
         .ok_or_else(|| "companion menu window not found".to_string())?;
 
     let has_animation_menu = !wall_locked && !underside_locked && !available_actions.is_empty();
-    let item_count = if has_animation_menu { 5 } else { 4 };
+    let item_count = if has_animation_menu { 6 } else { 5 };
     let menu_height = MENU_VERTICAL_PADDING + item_count as f64 * MENU_ITEM_HEIGHT;
     let scale_factor = window
         .scale_factor()
@@ -198,7 +198,7 @@ pub fn resize_companion_menu(
         .lock()
         .map_err(|error| format!("failed to lock companion menu anchor: {error}"))?
         .ok_or_else(|| "companion menu anchor not found".to_string())?;
-    let item_count = 5 + if expanded { animation_item_count } else { 0 };
+    let item_count = 6 + if expanded { animation_item_count } else { 0 };
     let menu_height =
         (MENU_VERTICAL_PADDING + item_count as f64 * MENU_ITEM_HEIGHT).min(MAX_MENU_HEIGHT);
     let bounds = query_desktop_bounds()?;

@@ -17,13 +17,23 @@ use data_folder::{get_characters_folder_fingerprint, open_characters_folder};
 use main_window::{configure_main_window, handle_window_event};
 use tray::create_tray;
 
+const AUTOSTART_ARG: &str = "--autostart";
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let launched_from_autostart =
+        std::env::args_os().any(|argument| argument == std::ffi::OsStr::new(AUTOSTART_ARG));
+
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .arg(AUTOSTART_ARG)
+                .build(),
+        )
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .setup(|app| {
-            configure_main_window(app.handle())?;
+        .setup(move |app| {
+            configure_main_window(app.handle(), !launched_from_autostart)?;
             // companion instance windows are spawned on demand by the dashboard;
             // the shared menu + picker windows are created up front
             create_companion_menu_window(app.handle())?;

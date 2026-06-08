@@ -1,10 +1,17 @@
 import { openCharactersFolder } from "../../services/tomojiStorage";
 import { useAppSettings } from "../../hooks/useAppSettings";
+import { useAutostart } from "../../hooks/useAutostart";
 import { SettingsSection } from "./SettingsSection";
 import { SettingsToggleRow } from "./SettingsToggleRow";
 
 export function SettingsView() {
   const { settings, isLoading, updateSettings } = useAppSettings();
+  const {
+    isAutostartEnabled,
+    isLoading: isAutostartLoading,
+    error: autostartError,
+    setAutostartEnabled,
+  } = useAutostart();
 
   return (
     <section className="min-h-0 flex-1 overflow-y-auto px-8 py-8">
@@ -18,6 +25,22 @@ export function SettingsView() {
           <p className="mt-8 text-sm text-neutral-500">Loading settings…</p>
         ) : (
           <div className="mt-8 space-y-4">
+            <SettingsSection
+              title="Startup"
+              description="Choose when Tomoji opens"
+            >
+              <SettingsToggleRow
+                label="Start Tomoji when computer starts"
+                description="Launch Tomoji automatically when you sign in"
+                checked={isAutostartEnabled}
+                disabled={isAutostartLoading}
+                onChange={(checked) => void setAutostartEnabled(checked)}
+              />
+              {autostartError ? (
+                <p className="mt-3 text-xs text-red-400">{autostartError}</p>
+              ) : null}
+            </SettingsSection>
+
             <SettingsSection
               title="Companion"
               description="How Tomojis behave when you open the app"

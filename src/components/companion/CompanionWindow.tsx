@@ -12,7 +12,10 @@ import { useCompanionMirrorBroadcast } from "../../hooks/useCompanionMirrorBroad
 import { useCompanionSpeechWindow } from "../../hooks/useCompanionSpeechWindow";
 import { useCompanionWindowSizeSync } from "../../hooks/useCompanionWindowSizeSync";
 import type { AnimationRegistry } from "../../services/animationRegistry";
-import { updateInstance } from "../../services/companionInstanceManager";
+import {
+  setInstanceEnabled,
+  updateInstance,
+} from "../../services/companionInstanceManager";
 import type { CompanionInstance } from "../../types/companionInstance";
 import { CompanionSprite } from "./CompanionSprite";
 import { CompanionSurfaceLockIndicator } from "./CompanionSurfaceLockIndicator";
@@ -26,6 +29,10 @@ function CompanionWindowInner({ instance, registry }: CompanionWindowInnerProps)
   const toggleMute = useCallback(() => {
     void updateInstance(instance.id, { muted: instance.muted !== true });
   }, [instance.id, instance.muted]);
+
+  const turnOff = useCallback(() => {
+    void setInstanceEnabled(instance.id, false);
+  }, [instance.id]);
 
   const {
     displayAction,
@@ -82,6 +89,7 @@ function CompanionWindowInner({ instance, registry }: CompanionWindowInnerProps)
     onPlayAnimation: playMenuAnimation,
     onToggleFreeze: toggleFreeze,
     onToggleMute: toggleMute,
+    onTurnOff: turnOff,
     onUnfreeze: unfreeze,
   });
   useCompanionWalkPickerEvents({

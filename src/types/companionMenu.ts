@@ -16,7 +16,8 @@ export type CompanionMenuAction =
   | "turnAround"
   | CompanionMenuAnimationAction
   | "toggleFreeze"
-  | "toggleMute";
+  | "toggleMute"
+  | "turnOff";
 
 export type TargetPickerMode = "walk" | "crawl" | "climb";
 

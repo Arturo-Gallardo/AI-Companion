@@ -180,6 +180,16 @@ export function CompanionMenuWindow() {
       >
         {frozen ? "Unfreeze" : "Freeze"}
       </button>
+
+      <button
+        type="button"
+        onClick={() => {
+          handleAction("turnOff");
+        }}
+        className="rounded px-2.5 py-1.5 text-left text-sm text-red-300 hover:bg-red-950/70"
+      >
+        Turn off
+      </button>
     </nav>
   );
 }
