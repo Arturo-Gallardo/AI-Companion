@@ -4,6 +4,7 @@ import {
   emitCompanionMenuAction,
   hideCompanionMenu,
   listenCompanionMenuConfig,
+  resizeCompanionMenu,
 } from "../../services/companionMenuApi";
 import type {
   CompanionMenuAction,
@@ -124,7 +125,11 @@ export function CompanionMenuWindow() {
             type="button"
             aria-expanded={animationsOpen}
             onClick={() => {
-              setAnimationsOpen((open) => !open);
+              setAnimationsOpen((open) => {
+                const expanded = !open;
+                void resizeCompanionMenu(expanded, animationItems.length);
+                return expanded;
+              });
             }}
             className="flex w-full items-center justify-between rounded px-2.5 py-1.5 text-left text-sm text-neutral-100 hover:bg-neutral-700/90"
           >

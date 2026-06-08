@@ -33,6 +33,13 @@ export async function hideCompanionMenu(): Promise<void> {
   await invoke("hide_companion_menu");
 }
 
+export async function resizeCompanionMenu(
+  expanded: boolean,
+  animationItemCount: number,
+): Promise<void> {
+  await invoke("resize_companion_menu", { expanded, animationItemCount });
+}
+
 export async function emitCompanionMenuAction(
   targetLabel: string,
   action: CompanionMenuAction,

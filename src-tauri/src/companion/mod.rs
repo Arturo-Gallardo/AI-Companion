@@ -10,7 +10,9 @@ use serde::Serialize;
 use tauri::window::Color;
 use tauri::{AppHandle, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 
-pub use menu::{create_companion_menu_window, hide_companion_menu, show_companion_menu};
+pub use menu::{
+    create_companion_menu_window, hide_companion_menu, resize_companion_menu, show_companion_menu,
+};
 pub use speech::{
     destroy_companion_speech_window, ensure_speech_window, hide_companion_speech,
     set_companion_speech_size, show_companion_speech, sync_companion_speech_position,
@@ -240,8 +242,11 @@ pub fn set_companion_position(
     anchor_x_offset: Option<f64>,
     anchor_y_offset: Option<f64>,
 ) -> Result<(), String> {
-    let x_offset = anchor_x_offset.unwrap_or(DEFAULT_ANCHOR_X_OFFSET);
-    let y_offset = anchor_y_offset.unwrap_or(DEFAULT_ANCHOR_Y_OFFSET);
+    let scale_factor = window
+        .scale_factor()
+        .map_err(|error| format!("failed to read companion scale factor: {error}"))?;
+    let x_offset = anchor_x_offset.unwrap_or(DEFAULT_ANCHOR_X_OFFSET) * scale_factor;
+    let y_offset = anchor_y_offset.unwrap_or(DEFAULT_ANCHOR_Y_OFFSET) * scale_factor;
     let (window_x, window_y) = companion_window_position(x, y, x_offset, y_offset);
 
     // a companion window moves itself, so the caller is the right target
@@ -335,7 +340,6 @@ pub async fn create_companion_instance_window(
         let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::default())
             .title("Companion")
             .inner_size(width, height)
-            .position(x, y)
             .decorations(false)
             .transparent(true)
             // shadows break transparency on windows and show as a grey box around the sprite
@@ -347,9 +351,16 @@ pub async fn create_companion_instance_window(
             .maximizable(false)
             .minimizable(false)
             .focused(false)
-            .visible(true)
+            .visible(false)
             .build()
             .map_err(|error| format!("failed to create companion window: {error}"))?;
+
+        window
+            .set_position(PhysicalPosition::new(x.round() as i32, y.round() as i32))
+            .map_err(|error| format!("failed to position companion window: {error}"))?;
+        window
+            .show()
+            .map_err(|error| format!("failed to show companion window: {error}"))?;
 
         // keep companions from grabbing each other as draggable surfaces
         if let Ok(hwnd) = window.hwnd() {

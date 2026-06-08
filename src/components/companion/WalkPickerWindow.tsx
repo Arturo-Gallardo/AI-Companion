@@ -1,20 +1,11 @@
 import { useEffect, useState } from "react";
-import { getDesktopBounds } from "../../services/companionApi";
 import {
   cancelWalkPicker,
   listenTargetPickerOpen,
   submitTargetPicker,
 } from "../../services/companionWalkPickerApi";
-import type { DesktopBounds } from "../../types/companion";
 import type { TargetPickerMode } from "../../types/companionMenu";
-
-function toAnchorX(clientX: number, bounds: DesktopBounds): number {
-  return bounds.virtualLeft + clientX;
-}
-
-function toAnchorY(clientY: number, bounds: DesktopBounds): number {
-  return bounds.virtualTop + clientY;
-}
+import { toPhysicalScreenPosition } from "../../utils/screenCoordinates";
 
 export function WalkPickerWindow() {
   const [mode, setMode] = useState<TargetPickerMode>("walk");
@@ -62,19 +53,17 @@ export function WalkPickerWindow() {
       return;
     }
 
-    const bounds = await getDesktopBounds();
+    const pointer = toPhysicalScreenPosition(event.screenX, event.screenY);
 
     if (mode === "climb") {
-      const anchorY = toAnchorY(event.clientY, bounds);
-      void submitTargetPicker(targetLabel, "climb", 0, anchorY);
+      void submitTargetPicker(targetLabel, "climb", 0, pointer.y);
       return;
     }
 
-    const anchorX = toAnchorX(event.clientX, bounds);
     void submitTargetPicker(
       targetLabel,
       mode === "crawl" ? "crawl" : "walk",
-      anchorX,
+      pointer.x,
       0,
     );
   };

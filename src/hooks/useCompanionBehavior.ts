@@ -17,6 +17,7 @@ import {
   type ScreenPosition,
   type SurfaceLock,
 } from "../types/companion";
+import { toPhysicalScreenPosition } from "../utils/screenCoordinates";
 import { DIALOGUE_DISPLAY_MS } from "../utils/dialogueDuration";
 import { isScreenEdgeHwnd } from "../utils/screenEdgeWalls";
 import { useCompanionDrag } from "./useCompanionDrag";
@@ -1116,15 +1117,17 @@ export function useCompanionBehavior({
         return;
       }
 
-      const adjustedDelta =
-        deltaY * behaviorSettingsRef.current.movementSpeed;
       const currentY = anchorYRef.current;
       const targetY = targetYRef.current;
+      const direction = targetY < currentY ? -1 : 1;
+      const adjustedDelta =
+        Math.abs(deltaY) *
+        direction *
+        behaviorSettingsRef.current.movementSpeed;
       const nextY = currentY + adjustedDelta;
-      const climbingUp = adjustedDelta < 0;
       const reachedTarget =
-        (climbingUp && nextY <= targetY) ||
-        (!climbingUp && nextY >= targetY);
+        (direction < 0 && nextY <= targetY) ||
+        (direction > 0 && nextY >= targetY);
 
       if (reachedTarget) {
         void finishClimbing(targetY);
@@ -1201,9 +1204,10 @@ export function useCompanionBehavior({
         return;
       }
 
+      const pointer = toPhysicalScreenPosition(event.screenX, event.screenY);
       void showCompanionMenu(
-        event.screenX,
-        event.screenY,
+        pointer.x,
+        pointer.y,
         isWallLocked,
         isUndersideLocked,
         isFrozen,

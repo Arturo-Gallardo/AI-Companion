@@ -10,6 +10,7 @@ import type {
   FallVelocity,
   ScreenPosition,
 } from "../types/companion";
+import { toPhysicalScreenPosition } from "../utils/screenCoordinates";
 
 const RESIST_DURATION_MS = 200;
 const VELOCITY_SAMPLE_COUNT = 3;
@@ -185,9 +186,10 @@ export function useCompanionDrag({
         return;
       }
 
+      const pointer = toPhysicalScreenPosition(event.screenX, event.screenY);
       const sample: PointerSample = {
-        x: event.screenX,
-        y: event.screenY,
+        x: pointer.x,
+        y: pointer.y,
         time: event.timeStamp,
       };
 
@@ -199,8 +201,8 @@ export function useCompanionDrag({
       const velocityX = computeVelocityX(pointerSamplesRef.current);
       const offset = dragOffsetRef.current;
       const nextPosition: ScreenPosition = {
-        x: event.screenX + offset.x,
-        y: event.screenY + offset.y,
+        x: pointer.x + offset.x,
+        y: pointer.y + offset.y,
       };
 
       updateLeanFromVelocity(velocityX);
@@ -233,17 +235,23 @@ export function useCompanionDrag({
 
       onDragStartRef.current();
 
-      dragOffsetRef.current = grabOffset;
+      const pointer = toPhysicalScreenPosition(event.screenX, event.screenY);
+      const scaleFactor = window.devicePixelRatio || 1;
+      const physicalGrabOffset = {
+        x: grabOffset.x * scaleFactor,
+        y: grabOffset.y * scaleFactor,
+      };
+      dragOffsetRef.current = physicalGrabOffset;
       const anchor = {
-        x: event.screenX + grabOffset.x,
-        y: event.screenY + grabOffset.y,
+        x: pointer.x + physicalGrabOffset.x,
+        y: pointer.y + physicalGrabOffset.y,
       };
       void setAnchorPosition(anchor, "walls");
 
       isDraggingRef.current = true;
       activePointerIdRef.current = event.pointerId;
       pointerSamplesRef.current = [
-        { x: event.screenX, y: event.screenY, time: event.timeStamp },
+        { x: pointer.x, y: pointer.y, time: event.timeStamp },
       ];
 
       setIsDragging(true);

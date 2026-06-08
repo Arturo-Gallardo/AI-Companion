@@ -1,3 +1,5 @@
+use std::sync::{LazyLock, Mutex};
+
 use serde::Serialize;
 use tauri::window::Color;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
@@ -20,9 +22,19 @@ pub struct CompanionMenuConfigPayload {
 
 const MENU_WIDTH: f64 = 152.0;
 const DEFAULT_MENU_HEIGHT: f64 = 154.0;
-const MAX_MENU_HEIGHT: f64 = 420.0;
+const MAX_MENU_HEIGHT: f64 = 300.0;
 const MENU_ITEM_HEIGHT: f64 = 36.0;
 const MENU_VERTICAL_PADDING: f64 = 10.0;
+
+#[derive(Clone, Copy)]
+struct MenuAnchor {
+    screen_x: f64,
+    screen_y: f64,
+    x: i32,
+    y: i32,
+}
+
+static MENU_ANCHOR: LazyLock<Mutex<Option<MenuAnchor>>> = LazyLock::new(|| Mutex::new(None));
 
 fn monitor_at_point<'a>(
     x: f64,
@@ -46,6 +58,7 @@ fn monitor_at_point<'a>(
 fn clamp_menu_position(
     screen_x: f64,
     screen_y: f64,
+    menu_width: f64,
     menu_height: f64,
 ) -> Result<(i32, i32), String> {
     let bounds = query_desktop_bounds()?;
@@ -65,7 +78,7 @@ fn clamp_menu_position(
         y = screen_y - menu_height;
     }
 
-    x = x.clamp(mon_left, (mon_right - MENU_WIDTH).max(mon_left));
+    x = x.clamp(mon_left, (mon_right - menu_width).max(mon_left));
     y = y.clamp(mon_top, (mon_bottom - menu_height).max(mon_top));
 
     Ok((x.round() as i32, y.round() as i32))
@@ -115,15 +128,27 @@ pub fn show_companion_menu(
         .get_webview_window(MENU_WINDOW_LABEL)
         .ok_or_else(|| "companion menu window not found".to_string())?;
 
-    let animation_item_count = if wall_locked || underside_locked {
-        0
-    } else {
-        available_actions.len()
-    };
-    let item_count = 3 + animation_item_count;
-    let menu_height =
-        (MENU_VERTICAL_PADDING + item_count as f64 * MENU_ITEM_HEIGHT).min(MAX_MENU_HEIGHT);
-    let (window_x, window_y) = clamp_menu_position(screen_x, screen_y, menu_height)?;
+    let has_animation_menu = !wall_locked && !underside_locked && !available_actions.is_empty();
+    let item_count = if has_animation_menu { 4 } else { 3 };
+    let menu_height = MENU_VERTICAL_PADDING + item_count as f64 * MENU_ITEM_HEIGHT;
+    let scale_factor = window
+        .scale_factor()
+        .map_err(|error| format!("failed to read companion menu scale factor: {error}"))?;
+    let (window_x, window_y) = clamp_menu_position(
+        screen_x,
+        screen_y,
+        MENU_WIDTH * scale_factor,
+        menu_height * scale_factor,
+    )?;
+    *MENU_ANCHOR
+        .lock()
+        .map_err(|error| format!("failed to lock companion menu anchor: {error}"))? =
+        Some(MenuAnchor {
+            screen_x,
+            screen_y,
+            x: window_x,
+            y: window_y,
+        });
 
     window
         .emit(
@@ -153,6 +178,45 @@ pub fn show_companion_menu(
     window
         .set_focus()
         .map_err(|error| format!("failed to focus companion menu window: {error}"))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn resize_companion_menu(
+    app: AppHandle,
+    expanded: bool,
+    animation_item_count: usize,
+) -> Result<(), String> {
+    let window = app
+        .get_webview_window(MENU_WINDOW_LABEL)
+        .ok_or_else(|| "companion menu window not found".to_string())?;
+    let anchor = MENU_ANCHOR
+        .lock()
+        .map_err(|error| format!("failed to lock companion menu anchor: {error}"))?
+        .ok_or_else(|| "companion menu anchor not found".to_string())?;
+    let item_count = 4 + if expanded { animation_item_count } else { 0 };
+    let menu_height =
+        (MENU_VERTICAL_PADDING + item_count as f64 * MENU_ITEM_HEIGHT).min(MAX_MENU_HEIGHT);
+    let bounds = query_desktop_bounds()?;
+    let monitor = monitor_at_point(anchor.screen_x, anchor.screen_y, &bounds.monitors)
+        .ok_or_else(|| "no monitors found".to_string())?;
+    let monitor_top = monitor.y as f64;
+    let monitor_bottom = monitor_top + monitor.height as f64;
+    let scale_factor = window
+        .scale_factor()
+        .map_err(|error| format!("failed to read companion menu scale factor: {error}"))?;
+    let physical_menu_height = menu_height * scale_factor;
+    let window_y = (anchor.y as f64)
+        .min(monitor_bottom - physical_menu_height)
+        .max(monitor_top);
+
+    window
+        .set_size(tauri::LogicalSize::new(MENU_WIDTH, menu_height))
+        .map_err(|error| format!("failed to resize companion menu window: {error}"))?;
+    window
+        .set_position(PhysicalPosition::new(anchor.x, window_y.round() as i32))
+        .map_err(|error| format!("failed to reposition companion menu window: {error}"))?;
 
     Ok(())
 }

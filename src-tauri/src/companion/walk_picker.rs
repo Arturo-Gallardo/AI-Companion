@@ -30,29 +30,23 @@ pub fn create_walk_picker_window(app: &AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
-    let bounds = query_desktop_bounds()?;
-
-    let picker_window = WebviewWindowBuilder::new(
-        app,
-        WALK_PICKER_WINDOW_LABEL,
-        WebviewUrl::default(),
-    )
-    .title("Walk Picker")
-    .inner_size(bounds.virtual_width as f64, bounds.virtual_height as f64)
-    .position(bounds.virtual_left as f64, bounds.virtual_top as f64)
-    .decorations(false)
-    .transparent(true)
-    .shadow(false)
-    .background_color(Color(0, 0, 0, 0))
-    .always_on_top(true)
-    .skip_taskbar(true)
-    .resizable(false)
-    .maximizable(false)
-    .minimizable(false)
-    .focused(true)
-    .visible(false)
-    .build()
-    .map_err(|error| format!("failed to create walk picker window: {error}"))?;
+    let picker_window =
+        WebviewWindowBuilder::new(app, WALK_PICKER_WINDOW_LABEL, WebviewUrl::default())
+            .title("Walk Picker")
+            .inner_size(1.0, 1.0)
+            .decorations(false)
+            .transparent(true)
+            .shadow(false)
+            .background_color(Color(0, 0, 0, 0))
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .maximizable(false)
+            .minimizable(false)
+            .focused(true)
+            .visible(false)
+            .build()
+            .map_err(|error| format!("failed to create walk picker window: {error}"))?;
 
     let _ = picker_window;
 
@@ -60,10 +54,7 @@ pub fn create_walk_picker_window(app: &AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn show_walk_picker(
-    caller: tauri::WebviewWindow,
-    mode: Option<String>,
-) -> Result<(), String> {
+pub fn show_walk_picker(caller: tauri::WebviewWindow, mode: Option<String>) -> Result<(), String> {
     let app = caller.app_handle().clone();
     let target_label = caller.label().to_string();
     let _ = hide_companion_menu(app.clone());
@@ -76,14 +67,17 @@ pub fn show_walk_picker(
         .ok_or_else(|| "walk picker window not found".to_string())?;
 
     window
-        .set_size(tauri::LogicalSize::new(
-            bounds.virtual_width as f64,
-            bounds.virtual_height as f64,
+        .set_size(tauri::PhysicalSize::new(
+            bounds.virtual_width,
+            bounds.virtual_height,
         ))
         .map_err(|error| format!("failed to resize walk picker window: {error}"))?;
 
     window
-        .set_position(PhysicalPosition::new(bounds.virtual_left, bounds.virtual_top))
+        .set_position(PhysicalPosition::new(
+            bounds.virtual_left,
+            bounds.virtual_top,
+        ))
         .map_err(|error| format!("failed to position walk picker window: {error}"))?;
 
     window
