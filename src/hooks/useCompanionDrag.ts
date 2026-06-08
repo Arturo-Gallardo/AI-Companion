@@ -45,6 +45,7 @@ function computeVelocityX(samples: PointerSample[]): number {
 interface UseCompanionDragOptions {
   isEnabled: boolean;
   skipResistDelay: boolean;
+  grabOffset: DragOffset;
   getAnchorPosition: () => ScreenPosition;
   setAnchorPosition: (
     position: ScreenPosition,
@@ -65,6 +66,7 @@ interface UseCompanionDragResult {
 export function useCompanionDrag({
   isEnabled,
   skipResistDelay,
+  grabOffset,
   getAnchorPosition,
   setAnchorPosition,
   onDragStart,
@@ -231,11 +233,12 @@ export function useCompanionDrag({
 
       onDragStartRef.current();
 
-      const anchor = getAnchorPosition();
-      dragOffsetRef.current = {
-        x: anchor.x - event.screenX,
-        y: anchor.y - event.screenY,
+      dragOffsetRef.current = grabOffset;
+      const anchor = {
+        x: event.screenX + grabOffset.x,
+        y: event.screenY + grabOffset.y,
       };
+      void setAnchorPosition(anchor, "walls");
 
       isDraggingRef.current = true;
       activePointerIdRef.current = event.pointerId;
@@ -261,7 +264,13 @@ export function useCompanionDrag({
         onResistEndRef.current();
       }, RESIST_DURATION_MS);
     },
-    [clearResistTimeout, getAnchorPosition, isEnabled, resetLeanState],
+    [
+      clearResistTimeout,
+      grabOffset,
+      isEnabled,
+      resetLeanState,
+      setAnchorPosition,
+    ],
   );
 
   return {

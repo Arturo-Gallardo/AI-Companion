@@ -91,44 +91,44 @@ export const ANIMATION_CATEGORY_META: Record<
   },
   dragLightLeft: {
     id: "dragLightLeft",
-    label: "Drag — light left",
+    label: "Drag — light right",
     description:
-      "Light lean while dragged slowly left. One still frame (or the first frame if you assign several). Shown when sideways movement is gentle.",
+      "Light lean while dragged slowly right. One still frame (or the first frame if you assign several). Shown when sideways movement is gentle.",
     group: "drag",
   },
   dragMildLeft: {
     id: "dragMildLeft",
-    label: "Drag — mild left",
-    description:
-      "Medium lean dragged left. One still frame held while movement is moderate — between light and strong.",
-    group: "drag",
-  },
-  dragStrongLeft: {
-    id: "dragStrongLeft",
-    label: "Drag — strong left",
-    description:
-      "Strong lean dragged or flung left. One still frame held while moving quickly to the left.",
-    group: "drag",
-  },
-  dragLightRight: {
-    id: "dragLightRight",
-    label: "Drag — light right",
-    description:
-      "Light lean while dragged slowly right. One still frame (or the first if several). Shown when sideways movement is gentle.",
-    group: "drag",
-  },
-  dragMildRight: {
-    id: "dragMildRight",
     label: "Drag — mild right",
     description:
       "Medium lean dragged right. One still frame held while movement is moderate — between light and strong.",
     group: "drag",
   },
-  dragStrongRight: {
-    id: "dragStrongRight",
+  dragStrongLeft: {
+    id: "dragStrongLeft",
     label: "Drag — strong right",
     description:
       "Strong lean dragged or flung right. One still frame held while moving quickly to the right.",
+    group: "drag",
+  },
+  dragLightRight: {
+    id: "dragLightRight",
+    label: "Drag — light left",
+    description:
+      "Light lean while dragged slowly left. One still frame (or the first if several). Shown when sideways movement is gentle.",
+    group: "drag",
+  },
+  dragMildRight: {
+    id: "dragMildRight",
+    label: "Drag — mild left",
+    description:
+      "Medium lean dragged left. One still frame held while movement is moderate — between light and strong.",
+    group: "drag",
+  },
+  dragStrongRight: {
+    id: "dragStrongRight",
+    label: "Drag — strong left",
+    description:
+      "Strong lean dragged or flung left. One still frame held while moving quickly to the left.",
     group: "drag",
   },
   dragResist: {

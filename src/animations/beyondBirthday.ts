@@ -112,7 +112,7 @@ function lightTierFromLean(lean: number): GrabbedLeanTier {
   return lean < 0 ? "lightLeft" : "lightRight";
 }
 
-// lean opposes drag direction — same feel as shimeji footX vs cursor offset
+// lean opposes drag direction, matching existing Shimeji sprite assignments
 export function resolveGrabbedLeanTier(
   previous: GrabbedLeanTier,
   velocityX: number,

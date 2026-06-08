@@ -1,5 +1,6 @@
 import { emit } from "@tauri-apps/api/event";
 import type {
+  AnimationCategory,
   CharacterLibraryEntry,
   CharacterManifest,
   CharacterSource,
@@ -16,12 +17,16 @@ import {
 import {
   characterDirPath,
   characterManifestPath,
+  characterSourcesDirPath,
   charactersDirPath,
   instancesFilePath,
   libraryFilePath,
 } from "./fs/appPaths";
 import {
+  copyFile,
   ensureDir,
+  getBasename,
+  getDirname,
   joinPath,
   listDirectory,
   movePath,
@@ -145,7 +150,6 @@ async function migrateTomojiFolderNames(): Promise<void> {
     const oldDir =
       entry.folderPath ?? (await characterDirPath(currentId));
     const newDir = await characterDirPath(targetId);
-
     if (await pathExists(oldDir) && !(await pathExists(newDir))) {
       await movePath(oldDir, newDir);
     }
@@ -229,6 +233,95 @@ async function ensureTomojiFolderNamesMigrated(): Promise<void> {
   }
 
   await folderMigrationPromise;
+}
+
+async function migrateCharacterSources(
+  manifest: CharacterManifest,
+  characterDir: string,
+): Promise<CharacterManifest> {
+  const characterId = manifest.id;
+  const legacySourcesDir = await joinPath(characterDir, "sprites", "source");
+  const sourcesDir = await characterSourcesDirPath(characterId);
+  const externalSourcesDir = await joinPath(
+    await getDirname(characterDir),
+    "..",
+    "sources",
+    characterId,
+  );
+
+  if (
+    !(await pathExists(sourcesDir)) &&
+    (await pathExists(legacySourcesDir))
+  ) {
+    await movePath(legacySourcesDir, sourcesDir);
+  }
+  if (
+    !(await pathExists(sourcesDir)) &&
+    (await pathExists(externalSourcesDir))
+  ) {
+    await movePath(externalSourcesDir, sourcesDir);
+  }
+
+  await ensureDir(sourcesDir);
+
+  const sourceFilenameBySrc = new Map<string, string>();
+  const usedFilenames = new Set(
+    (await listDirectory(sourcesDir))
+      .filter((entry) => entry.isFile)
+      .map((entry) => entry.name),
+  );
+  let changed = false;
+
+  const animations = { ...manifest.animations };
+
+  for (const [category, definition] of Object.entries(
+    manifest.animations,
+  ) as [AnimationCategory, NonNullable<typeof manifest.animations[AnimationCategory]>][]) {
+    const frames = [];
+
+    for (let index = 0; index < definition.frames.length; index += 1) {
+      const frame = definition.frames[index];
+      const existingFilename = frame.source
+        ? await getBasename(frame.source)
+        : sourceFilenameBySrc.get(frame.src);
+      let filename = existingFilename;
+
+      if (!filename) {
+        const basename = await getBasename(frame.src);
+        filename = `${category}-${index
+          .toString()
+          .padStart(4, "0")}-${basename}`;
+
+        let suffix = 1;
+        while (usedFilenames.has(filename)) {
+          filename = `${category}-${index
+            .toString()
+            .padStart(4, "0")}-${suffix}-${basename}`;
+          suffix += 1;
+        }
+      }
+
+      const sourcePath = await joinPath(sourcesDir, filename);
+      if (!(await pathExists(sourcePath))) {
+        await copyFile(await joinPath(characterDir, frame.src), sourcePath);
+      }
+
+      usedFilenames.add(filename);
+      sourceFilenameBySrc.set(frame.src, filename);
+
+      if (frame.source === filename) {
+        frames.push(frame);
+        continue;
+      }
+
+      changed = true;
+      frames.push({ ...frame, source: filename });
+    }
+
+    animations[category] = { ...definition, frames };
+  }
+
+  return changed ? { ...manifest, animations } : manifest;
 }
 
 export async function allocateNewTomojiFolderName(name: string): Promise<string> {
@@ -413,8 +506,11 @@ export async function syncCharactersFromDisk(): Promise<CharacterSyncResult> {
 
     let manifest = parsed as CharacterManifest;
     const folderPath = entry.path;
+    manifest = await migrateCharacterSources(manifest, folderPath);
     const manifestChanged =
-      manifest.id !== folderName || manifest.name !== folderName;
+      manifest !== parsed ||
+      manifest.id !== folderName ||
+      manifest.name !== folderName;
 
     if (manifestChanged) {
       manifest = { ...manifest, id: folderName, name: folderName };
@@ -498,7 +594,6 @@ export async function renameTomojiCharacter(
 
   const oldDir = entry.folderPath ?? (await characterDirPath(currentId));
   const newDir = await characterDirPath(targetId);
-
   if (await pathExists(oldDir)) {
     await movePath(oldDir, newDir);
   } else {

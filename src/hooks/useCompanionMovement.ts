@@ -74,8 +74,12 @@ interface UseCompanionMovementResult {
   getHorizontalWalkRange: () => { minX: number; maxX: number } | null;
   getVerticalClimbRange: () => { minY: number; maxY: number } | null;
   releaseSurfaceLockForDrag: () => void;
-  canLockSurfaceAt: (x: number, y: number) => Promise<boolean>;
-  tryLockSurfaceAt: (x: number, y: number) => Promise<SurfaceLock | null>;
+  getSurfaceLockAt: (x: number, y: number) => Promise<SurfaceLock | null>;
+  tryLockSurfaceAt: (
+    x: number,
+    y: number,
+    expectedLock?: SurfaceLock,
+  ) => Promise<SurfaceLock | null>;
 }
 
 interface SurfaceLockCandidate {
@@ -381,17 +385,26 @@ export function useCompanionMovement(
     [undersideProbeYOffset],
   );
 
-  const canLockSurfaceAt = useCallback(
-    async (x: number, y: number): Promise<boolean> => {
-      return (await findSurfaceLockAt(x, y)) !== null;
+  const getSurfaceLockAt = useCallback(
+    async (x: number, y: number): Promise<SurfaceLock | null> => {
+      return (await findSurfaceLockAt(x, y))?.lock ?? null;
     },
     [findSurfaceLockAt],
   );
 
   const tryLockSurfaceAt = useCallback(
-    async (x: number, y: number): Promise<SurfaceLock | null> => {
+    async (
+      x: number,
+      y: number,
+      expectedLock?: SurfaceLock,
+    ): Promise<SurfaceLock | null> => {
       const candidate = await findSurfaceLockAt(x, y);
-      if (!candidate) {
+      if (
+        !candidate ||
+        (expectedLock &&
+          (candidate.lock.hwnd !== expectedLock.hwnd ||
+            candidate.lock.kind !== expectedLock.kind))
+      ) {
         return null;
       }
 
@@ -601,7 +614,7 @@ export function useCompanionMovement(
     getHorizontalWalkRange,
     getVerticalClimbRange,
     releaseSurfaceLockForDrag,
-    canLockSurfaceAt,
+    getSurfaceLockAt,
     tryLockSurfaceAt,
   };
 }

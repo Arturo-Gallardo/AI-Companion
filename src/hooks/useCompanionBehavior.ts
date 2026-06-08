@@ -29,6 +29,7 @@ import { useCompanionMovement } from "./useCompanionMovement";
 const MIN_IDLE_MS = 3000;
 const MAX_IDLE_MS = 8000;
 const MIN_WALK_DISTANCE = 80;
+const SNAP_HOVER_DURATION_MS = 500;
 
 // shimeji-style floor idle: sometimes sit instead of walking
 const AUTONOMOUS_SIT_CHANCE = 0.32;
@@ -44,6 +45,13 @@ function randomIdleDelay(actionFrequency: number): number {
   const urgency = Math.max(actionFrequency, 0.05);
   const scale = 1 / urgency;
   return randomBetween(MIN_IDLE_MS * scale, MAX_IDLE_MS * scale);
+}
+
+function isSameSurfaceLock(
+  first: SurfaceLock | null,
+  second: SurfaceLock | null,
+): boolean {
+  return first?.hwnd === second?.hwnd && first?.kind === second?.kind;
 }
 
 interface UseCompanionBehaviorResult {
@@ -127,7 +135,7 @@ export function useCompanionBehavior({
     getHorizontalWalkRange,
     getVerticalClimbRange,
     releaseSurfaceLockForDrag,
-    canLockSurfaceAt,
+    getSurfaceLockAt,
     tryLockSurfaceAt,
   } = useCompanionMovement({
     registry,
@@ -158,6 +166,9 @@ export function useCompanionBehavior({
   const snapHintProbeRef = useRef(0);
   const snapHintProbeInFlightRef = useRef(false);
   const pendingSnapHintAnchorRef = useRef<ScreenPosition | null>(null);
+  const snapHoverTimeoutRef = useRef<number | null>(null);
+  const snapHoverTargetRef = useRef<SurfaceLock | null>(null);
+  const qualifiedSnapTargetRef = useRef<SurfaceLock | null>(null);
   const runSnapHintProbeRef = useRef<() => void>(() => {});
   const anchorXRef = useRef(anchorX);
   const anchorYRef = useRef(anchorY);
@@ -425,7 +436,46 @@ export function useCompanionBehavior({
   const clearTitleBarLockHint = useCallback(() => {
     snapHintProbeRef.current += 1;
     pendingSnapHintAnchorRef.current = null;
+    if (snapHoverTimeoutRef.current !== null) {
+      window.clearTimeout(snapHoverTimeoutRef.current);
+      snapHoverTimeoutRef.current = null;
+    }
+    snapHoverTargetRef.current = null;
+    qualifiedSnapTargetRef.current = null;
     setShowTitleBarLockHint(false);
+  }, []);
+
+  const updateSnapHoverTarget = useCallback((target: SurfaceLock | null) => {
+    if (isSameSurfaceLock(snapHoverTargetRef.current, target)) {
+      return;
+    }
+
+    if (snapHoverTimeoutRef.current !== null) {
+      window.clearTimeout(snapHoverTimeoutRef.current);
+      snapHoverTimeoutRef.current = null;
+    }
+
+    snapHoverTargetRef.current = target;
+    qualifiedSnapTargetRef.current = null;
+    setShowTitleBarLockHint(false);
+
+    if (!target) {
+      return;
+    }
+
+    const probeVersion = snapHintProbeRef.current;
+    snapHoverTimeoutRef.current = window.setTimeout(() => {
+      snapHoverTimeoutRef.current = null;
+
+      if (
+        snapHintProbeRef.current === probeVersion &&
+        isDraggingRef.current &&
+        isSameSurfaceLock(snapHoverTargetRef.current, target)
+      ) {
+        qualifiedSnapTargetRef.current = target;
+        setShowTitleBarLockHint(true);
+      }
+    }, SNAP_HOVER_DURATION_MS);
   }, []);
 
   const lockToWallAndIdle = useCallback(
@@ -471,13 +521,13 @@ export function useCompanionBehavior({
       snapHintProbeInFlightRef.current = true;
       const probeVersion = snapHintProbeRef.current;
 
-      void canLockSurfaceAt(anchor.x, anchor.y)
-        .then((canLock) => {
+      void getSurfaceLockAt(anchor.x, anchor.y)
+        .then((lock) => {
           if (
             snapHintProbeRef.current === probeVersion &&
             isDraggingRef.current
           ) {
-            setShowTitleBarLockHint(canLock);
+            updateSnapHoverTarget(lock);
           }
         })
         .finally(() => {
@@ -490,7 +540,7 @@ export function useCompanionBehavior({
           }
         });
     },
-    [canLockSurfaceAt],
+    [getSurfaceLockAt, updateSnapHoverTarget],
   );
   runSnapHintProbeRef.current = runSnapHintProbe;
 
@@ -503,6 +553,9 @@ export function useCompanionBehavior({
     return () => {
       snapHintProbeRef.current += 1;
       pendingSnapHintAnchorRef.current = null;
+      if (snapHoverTimeoutRef.current !== null) {
+        window.clearTimeout(snapHoverTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -548,11 +601,18 @@ export function useCompanionBehavior({
       anchor: { x: number; y: number };
     }) => {
       isDraggingRef.current = false;
+      const qualifiedSnapTarget = qualifiedSnapTargetRef.current;
       setSkipResistOnGrab(false);
       clearTitleBarLockHint();
 
       void (async () => {
-        const locked = await tryLockSurfaceAt(anchor.x, anchor.y);
+        const locked = qualifiedSnapTarget
+          ? await tryLockSurfaceAt(
+              anchor.x,
+              anchor.y,
+              qualifiedSnapTarget,
+            )
+          : null;
 
         if (locked?.kind === "titleBar") {
           const floorY = getFloorYAt(anchor.x, anchor.y);
@@ -611,6 +671,14 @@ export function useCompanionBehavior({
   const { grabbedLeanTier, onPointerDown } = useCompanionDrag({
     isEnabled: dragEnabled,
     skipResistDelay: skipResistOnGrab,
+    grabOffset: {
+      x:
+        (registry.getSpriteAnchor("idle").x - registry.spriteWidth / 2) *
+        scale,
+      y:
+        (registry.getSpriteAnchor("idle").y - registry.spriteHeight / 4) *
+        scale,
+    },
     getAnchorPosition,
     setAnchorPosition,
     onDragStart: handleDragStart,

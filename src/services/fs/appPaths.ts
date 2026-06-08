@@ -8,6 +8,7 @@ import { getAppDataDir, joinPath } from "./fileSystemAdapter";
 //   <appData>/characters/beyond-birthday/manifest.json  (bundled pet, seeded on first run)
 //   <appData>/characters/<folder-name>/manifest.json
 //   <appData>/characters/<folder-name>/sprites/<category>/*.png
+//   <appData>/characters/<folder-name>/source/*.png
 
 export async function libraryFilePath(): Promise<string> {
   return joinPath(await getAppDataDir(), "library.json");
@@ -39,4 +40,10 @@ export async function characterSpritesDirPath(
   characterId: string,
 ): Promise<string> {
   return joinPath(await characterDirPath(characterId), "sprites");
+}
+
+export async function characterSourcesDirPath(
+  characterId: string,
+): Promise<string> {
+  return joinPath(await characterDirPath(characterId), "source");
 }

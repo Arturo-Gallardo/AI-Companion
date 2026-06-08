@@ -9,6 +9,7 @@ import { addCharacter, getCharacter, allocateNewTomojiFolderName } from "./chara
 import {
   characterDirPath,
   characterManifestPath,
+  characterSourcesDirPath,
   characterSpritesDirPath,
 } from "./fs/appPaths";
 import {
@@ -48,12 +49,21 @@ async function listCharacterSpriteSources(
   characterId: string,
 ): Promise<ShimejiSourceFrame[]> {
   const spritesDir = await characterSpritesDirPath(characterId);
-  if (!(await pathExists(spritesDir))) {
+  const sourcesDir = await characterSourcesDirPath(characterId);
+  const legacySourceDir = await joinPath(spritesDir, "source");
+
+  if (
+    !(await pathExists(sourcesDir)) &&
+    (await pathExists(legacySourceDir))
+  ) {
+    await renamePath(legacySourceDir, sourcesDir);
+  }
+
+  const searchDir = (await pathExists(sourcesDir)) ? sourcesDir : spritesDir;
+  if (!(await pathExists(searchDir))) {
     return [];
   }
 
-  const sourceDir = await joinPath(spritesDir, "source");
-  const searchDir = (await pathExists(sourceDir)) ? sourceDir : spritesDir;
   const sources: ShimejiSourceFrame[] = [];
 
   async function walk(dir: string): Promise<void> {
@@ -115,8 +125,16 @@ async function writeDraftSprites(
 ): Promise<Map<string, string>> {
   const destDir = await characterDirPath(characterId);
   const spritesDir = await characterSpritesDirPath(characterId);
-  const stagingDir = `${spritesDir}.${crypto.randomUUID()}.tmp`;
-  const backupDir = `${spritesDir}.${crypto.randomUUID()}.bak`;
+  const sourcesDir = await characterSourcesDirPath(characterId);
+  const transactionId = crypto.randomUUID();
+  const spritesStagingDir = `${spritesDir}.${transactionId}.tmp`;
+  const spritesBackupDir = `${spritesDir}.${transactionId}.bak`;
+  const sourcesStagingDir = `${sourcesDir}.${transactionId}.tmp`;
+  const sourcesBackupDir = `${sourcesDir}.${transactionId}.bak`;
+  let spritesBackupCreated = false;
+  let sourcesBackupCreated = false;
+  let spritesInstalled = false;
+  let sourcesInstalled = false;
 
   await ensureDir(destDir);
 
@@ -129,8 +147,7 @@ async function writeDraftSprites(
     ].filter((path, index, paths) => paths.indexOf(path) === index);
     const sourcePathByInput = new Map<string, string>();
     const usedSourceFilenames = new Set<string>();
-    const sourceDir = await joinPath(stagingDir, "source");
-    await ensureDir(sourceDir);
+    await ensureDir(sourcesStagingDir);
 
     for (let index = 0; index < sourcePaths.length; index += 1) {
       const source = sourcePaths[index];
@@ -142,9 +159,9 @@ async function writeDraftSprites(
         suffix += 1;
       }
       usedSourceFilenames.add(filename);
-      const dest = await joinPath(sourceDir, filename);
+      const dest = await joinPath(sourcesStagingDir, filename);
       await copyFile(source, dest);
-      sourcePathByInput.set(source, `sprites/source/${filename}`);
+      sourcePathByInput.set(source, filename);
     }
 
     for (const [category, assignment] of Object.entries(draft.assignments) as [
@@ -155,7 +172,7 @@ async function writeDraftSprites(
         continue;
       }
 
-      const categoryDir = await joinPath(stagingDir, category);
+      const categoryDir = await joinPath(spritesStagingDir, category);
       await ensureDir(categoryDir);
 
       for (let index = 0; index < assignment.frames.length; index += 1) {
@@ -166,20 +183,38 @@ async function writeDraftSprites(
     }
 
     if (await pathExists(spritesDir)) {
-      await renamePath(spritesDir, backupDir);
+      await renamePath(spritesDir, spritesBackupDir);
+      spritesBackupCreated = true;
+    }
+    if (await pathExists(sourcesDir)) {
+      await renamePath(sourcesDir, sourcesBackupDir);
+      sourcesBackupCreated = true;
     }
 
-    await renamePath(stagingDir, spritesDir);
-    await removePath(backupDir);
+    await renamePath(sourcesStagingDir, sourcesDir);
+    sourcesInstalled = true;
+    await renamePath(spritesStagingDir, spritesDir);
+    spritesInstalled = true;
+    await Promise.allSettled([
+      removePath(spritesBackupDir),
+      removePath(sourcesBackupDir),
+    ]);
     return sourcePathByInput;
   } catch (error) {
-    await removePath(stagingDir);
+    await removePath(spritesStagingDir);
+    await removePath(sourcesStagingDir);
 
-    if (
-      (await pathExists(backupDir)) &&
-      !(await pathExists(spritesDir))
-    ) {
-      await renamePath(backupDir, spritesDir);
+    if (spritesInstalled) {
+      await removePath(spritesDir);
+    }
+    if (spritesBackupCreated && (await pathExists(spritesBackupDir))) {
+      await renamePath(spritesBackupDir, spritesDir);
+    }
+    if (sourcesInstalled) {
+      await removePath(sourcesDir);
+    }
+    if (sourcesBackupCreated && (await pathExists(sourcesBackupDir))) {
+      await renamePath(sourcesBackupDir, sourcesDir);
     }
 
     throw error;
@@ -197,6 +232,7 @@ export async function loadCharacterDraft(
 
   const manifest = entry.manifest;
   const characterDir = await characterDirPath(characterId);
+  const sourcesDir = await characterSourcesDirPath(characterId);
   const sources = await listCharacterSpriteSources(characterId);
   const assignments = ANIMATION_CATEGORIES.reduce(
     (accumulator, category) => {
@@ -214,7 +250,16 @@ export async function loadCharacterDraft(
 
     const frames: string[] = [];
     for (const frame of definition.frames) {
-      frames.push(await joinPath(characterDir, frame.source ?? frame.src));
+      if (frame.source) {
+        const sourceFilename = await getBasename(frame.source);
+        const sourcePath = await joinPath(sourcesDir, sourceFilename);
+        if (await pathExists(sourcePath)) {
+          frames.push(sourcePath);
+          continue;
+        }
+      }
+
+      frames.push(await joinPath(characterDir, frame.src));
     }
 
     assignments[category] = {
@@ -262,8 +307,8 @@ export async function saveCharacterDraft(
 }
 
 // converts the wizard draft into the Tomoji folder structure: copies the
-// chosen pngs into characters/<id>/sprites/<category>/<n>.png and writes a
-// valid manifest.json. only the user's own files are written - no bundling.
+// chosen pngs into characters/<id>/sprites/<category>/<n>.png, keeps editable
+// originals in characters/<id>/source, and writes a valid manifest.json.
 export async function convertShimejiDraft(
   draft: ShimejiDraft,
 ): Promise<string> {
