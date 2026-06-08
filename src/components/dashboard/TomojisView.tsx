@@ -23,6 +23,43 @@ function companionCountLabel(count: number): string {
   return `${count} companion${count === 1 ? "" : "s"}`;
 }
 
+function RefreshIcon({ spinning = false }: { spinning?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`h-4 w-4 ${spinning ? "animate-spin" : ""}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M20 11a8 8 0 1 0-2.34 5.66" />
+      <path d="M20 4v7h-7" />
+    </svg>
+  );
+}
+
+function ArchiveIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 5h18v4H3z" />
+      <path d="M5 9v10h14V9" />
+      <path d="M10 13h4" />
+    </svg>
+  );
+}
+
 export function TomojisView() {
   const {
     instances,
@@ -62,9 +99,11 @@ export function TomojisView() {
         type="button"
         onClick={() => void handleRefresh()}
         disabled={isRefreshing}
-        className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:border-white hover:text-white disabled:cursor-wait disabled:opacity-50"
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-700 text-neutral-300 hover:border-white hover:text-white disabled:cursor-wait disabled:opacity-50"
+        aria-label={isRefreshing ? "Refreshing Tomojis" : "Refresh Tomojis"}
+        title={isRefreshing ? "Refreshing Tomojis" : "Refresh Tomojis"}
       >
-        {isRefreshing ? "Refreshing..." : "Refresh"}
+        <RefreshIcon spinning={isRefreshing} />
       </button>
       <button
         type="button"
@@ -160,12 +199,19 @@ export function TomojisView() {
               <button
                 type="button"
                 onClick={() => setFlow("archive")}
-                className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:border-white hover:text-white"
+                className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-700 text-neutral-300 hover:border-white hover:text-white"
+                aria-label="View archived Tomojis"
+                title="View archived Tomojis"
               >
-                Archive
-                {archivedInstances.length > 0
-                  ? ` (${archivedInstances.length})`
-                  : ""}
+                <ArchiveIcon />
+                {archivedInstances.length > 0 ? (
+                  <span
+                    className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-white px-1 text-center text-[10px] font-bold leading-4 text-black"
+                    aria-hidden
+                  >
+                    {archivedInstances.length}
+                  </span>
+                ) : null}
               </button>
               {folderActions}
             </div>

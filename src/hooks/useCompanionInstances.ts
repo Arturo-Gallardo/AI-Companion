@@ -105,7 +105,7 @@ export function useCompanionInstances(): UseCompanionInstancesResult {
   }, []);
 
   const refreshFromDisk = useCallback(async () => {
-    await reconcileTomojiRegistry({ spawnNew: true });
+    await reconcileTomojiRegistry({ refreshEnabled: true });
   }, []);
 
   const activeInstances = useMemo(

@@ -227,8 +227,10 @@ async function reconcileTomojiRegistryInternal(): Promise<{
 // full disk sync + instance repair. deduped — safe to call from poll/refresh.
 export async function reconcileTomojiRegistry(options?: {
   spawnNew?: boolean;
+  refreshEnabled?: boolean;
 }): Promise<CompanionInstance[]> {
   const spawnNew = options?.spawnNew ?? false;
+  const refreshEnabled = options?.refreshEnabled ?? false;
 
   if (!reconcileInFlight) {
     reconcileInFlight = reconcileTomojiRegistryInternal().finally(() => {
@@ -237,7 +239,20 @@ export async function reconcileTomojiRegistry(options?: {
   }
 
   const result = await reconcileInFlight;
-  if (spawnNew) {
+  if (refreshEnabled) {
+    for (const instance of result.instances) {
+      if (!instance.enabled || instance.archived) {
+        continue;
+      }
+
+      try {
+        await destroyCompanionInstanceWindow(instance.id);
+        await spawnInstanceWindow(instance);
+      } catch (error) {
+        console.error("failed to refresh companion", error);
+      }
+    }
+  } else if (spawnNew) {
     for (const instance of result.newlyAdded) {
       if (!instance.enabled || instance.archived) {
         continue;
